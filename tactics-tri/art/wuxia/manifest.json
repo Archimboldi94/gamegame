@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "project": "天平之誓",
+  "art_direction": "写实江湖武侠",
+  "status": "静态方向样张，未接入主游戏",
+  "generator": "内置 imagegen",
+  "prompt_record": "PROMPTS.md",
+  "assets": [
+    {
+      "id": "linyan_fullbody_v1",
+      "file": "characters/linyan/linyan_fullbody_v1.png",
+      "width": 1024,
+      "height": 1536,
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        254
+      ],
+      "solid_bbox_alpha_gte_128": [
+        244,
+        17,
+        881,
+        1519
+      ],
+      "role": "角色立绘",
+      "reference": null
+    },
+    {
+      "id": "linyan_tactical_se_v1",
+      "file": "characters/linyan/linyan_tactical_se_v1.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "solid_bbox_alpha_gte_128": [
+        302,
+        20,
+        1212,
+        1237
+      ],
+      "review_region_xywh": [
+        294,
+        12,
+        926,
+        1233
+      ],
+      "role": "俯视战场人物候选图",
+      "reference": "linyan_fullbody_v1",
+      "facings_available": 1,
+      "animation_frames": 1
+    }
+  ],
+  "runtime_contract": {
+    "unit_source_size": [
+      96,
+      128
+    ],
+    "unit_scale": 0.82,
+    "tile_top_size": [
+      160,
+      80
+    ],
+    "height_step": 40
+  },
+  "validation": {
+    "image_files_checked": true,
+    "alpha_channels_checked": true,
+    "game_runtime_checked": false,
+    "approved_for_release": false
+  },
+  "pending": [
+    "多朝向与动作",
+    "武器握法与左右手复核",
+    "透明边缘修整",
+    "脚底锚点",
+    "头像裁切",
+    "新场景与界面",
+    "引擎内验收"
+  ]
+}
