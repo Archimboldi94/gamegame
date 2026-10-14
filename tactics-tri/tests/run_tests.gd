@@ -7,6 +7,11 @@ var _current := ""
 
 
 func _init() -> void:
+	# Defer until autoloads have finished _ready (AudioManager buses/streams).
+	call_deferred("_run_all")
+
+
+func _run_all() -> void:
 	var tests := [
 		"test_climb_cost_and_jump_limit", "test_drop_limit", "test_terrain_costs_and_evasion",
 		"test_allies_passable_enemies_block", "test_height_damage", "test_ranged_height_range_bonus",
@@ -20,6 +25,8 @@ func _init() -> void:
 		"test_water_blocks_ai_and_knockback", "test_maps_river_crossings", "test_auto_facing_after_move",
 		"test_auto_facing_toward_target", "test_auto_facing_consistent_with_back_attack",
 		"test_every_skill_has_cast_visual", "test_back_button_does_not_quit_battle",
+		"test_iso_rotate_and_pick", "test_pick_ignores_sprite_bounds",
+		"test_water_still_impassable_after_view_rotate", "test_audio_placeholders_and_manager",
 	]
 	for t in tests:
 		_current = t
@@ -769,3 +776,124 @@ func test_every_skill_has_cast_visual() -> void:
 
 func test_back_button_does_not_quit_battle() -> void:
 	eq(ProjectSettings.get_setting("application/config/quit_on_go_back", true), false, "Android back cancels instead of quitting")
+
+
+# ------------------------------------------------------------ camera rotate / grid pick / audio
+
+func test_iso_rotate_and_pick() -> void:
+	var m := BattleMap.flat(4, 4)
+	m.set_h(Vector2i(1, 1), 2)
+	m.set_h(Vector2i(2, 2), 1)
+	var view := IsoView.new()
+	view.configure(4, 4, 0)
+	var logical := Vector2i(1, 2)
+	# Identity at yaw 0
+	eq(view.to_display(logical), logical, "yaw0 display == logical")
+	eq(view.to_logical(logical), logical, "yaw0 logical == display")
+	# Round-trip through every yaw
+	for yaw in range(4):
+		view.yaw = yaw
+		var d := view.to_display(logical)
+		eq(view.to_logical(d), logical, "yaw%d rotate round-trip" % yaw)
+		var world := view.screen(logical, m.get_h(logical))
+		eq(view.pick(world, m), logical, "yaw%d pick centre of tile" % yaw)
+	# 90° CW: (0,0)->(0,3), (3,0)->(0,0), (3,3)->(3,0), (0,3)->(3,3)
+	view.yaw = 1
+	eq(view.to_display(Vector2i(0, 0)), Vector2i(0, 3), "CW (0,0)")
+	eq(view.to_display(Vector2i(3, 0)), Vector2i(0, 0), "CW (3,0)")
+	eq(view.to_display(Vector2i(3, 3)), Vector2i(3, 0), "CW (3,3)")
+	eq(view.to_display(Vector2i(0, 3)), Vector2i(3, 3), "CW (0,3)")
+	# Facing arrows rotate with the camera
+	eq(view.facing_view(0), 1, "facing 0 becomes 1 at yaw 1")
+	check(view.faces_left(0) == false, "facing 0 not left at yaw 1")
+	check(IsoView.rotate_cell(Vector2i(1, 0), 2, 4, 4) == Vector2i(2, 3), "static rotate 180")
+	check(IsoView.unrotate_cell(Vector2i(2, 3), 2, 4, 4) == Vector2i(1, 0), "static unrotate 180")
+
+
+func test_pick_ignores_sprite_bounds() -> void:
+	# Tall unit sprites sit above the tile; picking must use the diamond under the point.
+	var m := BattleMap.flat(3, 3)
+	var view := IsoView.new()
+	view.configure(3, 3, 0)
+	var cell := Vector2i(1, 1)
+	var top := view.screen(cell, 0)
+	# A point on the tile top face
+	eq(view.pick(top + Vector2(0, 0), m), cell, "pick hits tile top")
+	# A point well above the diamond (where a unit sprite would be) must NOT select via sprite
+	var above := top + Vector2(0, -120)
+	var picked := view.pick(above, m)
+	check(picked != cell, "point above the diamond is not the standing cell")
+	# After 90° rotation the same logical cell is still pickable at its new screen pos
+	view.rotate_by(1)
+	var top_r := view.screen(cell, 0)
+	eq(view.pick(top_r, m), cell, "pick after 90° still returns logical cell")
+
+
+func test_water_still_impassable_after_view_rotate() -> void:
+	var m := river_map()
+	var water := Vector2i(2, 2)
+	check(not m.is_passable(water), "water impassable before rotate")
+	var view := IsoView.new()
+	view.configure(m.width, m.height, 0)
+	for yaw in range(4):
+		view.yaw = yaw
+		check(not m.is_passable(water), "water impassable at yaw %d" % yaw)
+		eq(Pathing.enter_cost(m, 9, Vector2i(1, 2), water), -1, "pathing blocked at yaw %d" % yaw)
+		# Picking the water tile still resolves to the logical water cell
+		var wp := view.screen(water, m.get_h(water))
+		eq(view.pick(wp, m), water, "pick water logical cell at yaw %d" % yaw)
+	var u := mk(0, "swordsman", 0, Vector2i(1, 2))
+	var r := Pathing.search(m, u, [u], 8)
+	check(not r["cost"].has(water), "reachable set never includes deep water")
+
+
+func test_audio_placeholders_and_manager() -> void:
+	var sfx := [
+		"ui_tap", "ui_confirm", "ui_cancel", "unit_select",
+		"move_step_grass", "move_step_stone", "move_step_water",
+		"atk_sword", "atk_bow", "atk_shield", "hit_flesh", "hit_block", "crit",
+		"heal", "skill_cast", "unit_down", "turn_start_ally", "turn_start_enemy",
+		"victory", "defeat", "amb_night_wind",
+	]
+	for id in sfx:
+		check(ResourceLoader.exists("res://audio/sfx/%s.ogg" % id), "sfx file %s.ogg" % id)
+	check(ResourceLoader.exists("res://audio/bgm/bgm_battle_loop.ogg"), "bgm_battle_loop.ogg exists")
+	check(ProjectSettings.has_setting("autoload/AudioManager"), "AudioManager registered as autoload")
+	var am_path: String = str(ProjectSettings.get_setting("autoload/AudioManager"))
+	check(am_path.ends_with("audio_manager.gd"), "AudioManager points at audio_manager.gd")
+	# -s SceneTree scripts don't get autoload globals at parse time; resolve by node path.
+	var am: Node = root.get_node_or_null("AudioManager")
+	var spawned := false
+	if am == null:
+		am = load("res://scripts/game/audio_manager.gd").new()
+		root.add_child(am)
+		spawned = true
+	check(am.has_clip("ui_tap"), "AudioManager loaded ui_tap")
+	check(am.has_clip("bgm_battle_loop"), "AudioManager loaded bgm")
+	check(AudioServer.get_bus_index("BGM") >= 0, "BGM bus exists")
+	check(AudioServer.get_bus_index("SFX") >= 0, "SFX bus exists")
+	var players_before := 0
+	for c in am.get_children():
+		if c is AudioStreamPlayer:
+			players_before += 1
+	am.play_bgm("bgm_battle_loop")
+	am.play_bgm("bgm_battle_loop")
+	am.play_ambience("amb_night_wind")
+	am.play_ambience("amb_night_wind")
+	var players_after := 0
+	for c in am.get_children():
+		if c is AudioStreamPlayer:
+			players_after += 1
+	eq(players_after, players_before, "BGM/ambience play does not spawn extra players")
+	am.stop_battle_audio()
+	if spawned:
+		am.queue_free()
+	var battle_src := FileAccess.get_file_as_string("res://scripts/game/battle.gd")
+	check(battle_src.contains("_rotate_cam"), "battle has camera rotate")
+	check(battle_src.contains("view.pick"), "battle picks via grid view")
+	check(battle_src.contains("sel_ground"), "battle toggles unit/ground")
+	check(battle_src.contains("set_see_through"), "battle fades occluding units")
+	check(battle_src.contains("tile_cursor"), "battle draws cursor above units")
+	check(battle_src.contains("cell == sel_target"), "second tap on pending target detected")
+	check(battle_src.contains("_confirm()"), "second tap can confirm attack/skill")
+	check(FileAccess.file_exists("res://audio/CREDITS.md"), "audio CREDITS.md present")

@@ -6,6 +6,7 @@ extends Node2D
 const TileNode := preload("res://scripts/game/tile_node.gd")
 const UnitNode := preload("res://scripts/game/unit_node.gd")
 const BattleFX := preload("res://scripts/game/battle_fx.gd")
+const TileCursor := preload("res://scripts/game/tile_cursor.gd")
 
 const NONE := Vector2i(-1, -1)
 const COL_MOVE := Color(0.3, 0.6, 1.0, 0.45)
@@ -37,9 +38,11 @@ const SKILL_COL := {
 
 var def: Dictionary
 var state: BattleState
+var view: IsoView
 var world: Node2D
 var fx: BattleFX
 var cam: Camera2D
+var tile_cursor: Node2D
 var tiles := {}
 var unit_nodes := {}
 
@@ -66,8 +69,10 @@ var ui_blockers: Array = []
 var mode := "busy"
 var sel_skill := ""
 var sel_target := NONE
+var sel_ground := false  # true: focus ground on occupied tile (toggle)
 var move_info := {}
 var target_set: Array = []
+var focus_cell := NONE
 var cam_follow: Node2D
 var autoplay_turns := 0
 
@@ -82,9 +87,13 @@ var pinch_z0 := 1.0
 func _ready() -> void:
 	def = BattleDefs.get_def(Game.current_battle)
 	state = BattleDefs.build_state(Game.current_battle, 7 if Game.shot != "" or Game.autoplay != "" else randi())
+	view = IsoView.new()
+	view.configure(state.map.width, state.map.height)
 	_build_world()
 	_build_ui()
 	_refresh_all()
+	AudioManager.play_bgm("bgm_battle_loop")
+	AudioManager.play_ambience("amb_night_wind")
 	if Game.shot.begins_with("battle"):
 		_setup_shot()
 	elif Game.autoplay != "":
@@ -96,6 +105,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	AudioManager.stop_battle_audio()
 
 
 # ================================================================== construction
@@ -124,22 +134,25 @@ func _build_world() -> void:
 		for x in state.map.width:
 			var p := Vector2i(x, y)
 			var tn := TileNode.new()
-			tn.setup(p, state.map.get_h(p), state.map.get_terrain(p))
+			tn.setup(p, state.map.get_h(p), state.map.get_terrain(p), view)
 			world.add_child(tn)
 			tiles[p] = tn
 	for u in state.units:
 		var un := UnitNode.new()
-		un.setup(u)
+		un.setup(u, view)
 		un.place_at(u.pos, state.map.get_h(u.pos))
 		world.add_child(un)
 		unit_nodes[u.id] = un
 	fx = BattleFX.new()
 	fx.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	world.add_child(fx)
+	tile_cursor = TileCursor.new()
+	tile_cursor.hide_cursor()
+	world.add_child(tile_cursor)
 	cam = Camera2D.new()
 	world.add_child(cam)
 	cam.zoom = Vector2.ONE * ZOOM_DEFAULT
-	cam.position = TileNode.iso(Vector2i(state.map.width / 2, state.map.height / 2), 1)
+	cam.position = view.screen(Vector2i(state.map.width / 2, state.map.height / 2), 1)
 	cam.make_current()
 
 
@@ -200,10 +213,12 @@ func _build_ui() -> void:
 	tools.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mid.add_child(tools)
 	var b_center := UIKit.button("镜头归位", _recenter, 170, 96)
+	var b_rot_l := UIKit.button("左转90°", _rotate_cam.bind(-1), 170, 96)
+	var b_rot_r := UIKit.button("右转90°", _rotate_cam.bind(1), 170, 96)
 	var b_in := UIKit.button("放大", _zoom_step.bind(1.2), 170, 96)
 	var b_out := UIKit.button("缩小", _zoom_step.bind(1.0 / 1.2), 170, 96)
 	speed_btn = UIKit.button("速度×1", _toggle_speed, 170, 96)
-	for b in [b_center, b_in, b_out, speed_btn]:
+	for b in [b_center, b_rot_l, b_rot_r, b_in, b_out, speed_btn]:
 		b.add_theme_font_size_override("font_size", 30)
 		tools.add_child(b)
 	mid.add_child(_spacer())
@@ -264,7 +279,7 @@ func _build_ui() -> void:
 	banner.modulate.a = 0.0
 	safe.add_child(banner)
 
-	ui_blockers = [head, tl, b_center, b_in, b_out, speed_btn, info, menu_panel, preview_panel]
+	ui_blockers = [head, tl, b_center, b_rot_l, b_rot_r, b_in, b_out, speed_btn, info, menu_panel, preview_panel]
 
 
 func _spacer() -> Control:
@@ -390,6 +405,9 @@ func _clear_hl() -> void:
 			tn.edge = Color(0, 0, 0, 0)
 			tn.cursor = false
 			tn.queue_redraw()
+	if tile_cursor != null:
+		tile_cursor.hide_cursor()
+	_clear_occlusion()
 
 
 func _clear_hl2() -> void:
@@ -418,9 +436,39 @@ func _set_edge(p: Vector2i, c: Color) -> void:
 
 
 func _set_cursor(p: Vector2i) -> void:
-	if tiles.has(p):
-		tiles[p].cursor = true
-		tiles[p].queue_redraw()
+	focus_cell = p
+	if p == NONE or not tiles.has(p):
+		if tile_cursor != null:
+			tile_cursor.hide_cursor()
+		_update_occlusion(NONE)
+		return
+	var h := state.map.get_h(p)
+	tile_cursor.show_at(view.screen(p, h), view.cursor_z(p))
+	_update_occlusion(p)
+
+
+func _clear_occlusion() -> void:
+	for id in unit_nodes:
+		unit_nodes[id].set_see_through(false)
+
+
+## Units whose sprites cover the focused tile (or stand on / in front of it) go translucent.
+func _update_occlusion(cell: Vector2i) -> void:
+	if cell == NONE:
+		_clear_occlusion()
+		return
+	var tile_top := view.screen(cell, state.map.get_h(cell))
+	var tile_z := view.tile_z(cell)
+	var diamond := Rect2(tile_top + Vector2(-64, -32), Vector2(128, 64))
+	for id in unit_nodes:
+		var n = unit_nodes[id]
+		if not n.visible or not n.unit.alive():
+			n.set_see_through(false)
+			continue
+		var covers: bool = n.unit.pos == cell
+		if not covers and n.z_index >= tile_z:
+			covers = n.world_rect().intersects(diamond)
+		n.set_see_through(covers)
 
 
 func _set_active(u: BattleUnit) -> void:
@@ -463,10 +511,13 @@ func _show_intro() -> void:
 		["胜利条件：" + def["win_text"], 34, Color(0.75, 0.95, 0.75)],
 		["败北条件：" + def["lose_text"], 34, Color(1, 0.7, 0.65)],
 		["点击蓝色格子移动 · 红框为攻击可及范围 · 右侧菜单选择行动", 28, Color(0.9, 0.9, 0.95)],
-		["单指拖动平移 · 双指捏合缩放 · 返回键取消/撤销移动", 28, Color(0.9, 0.9, 0.95)],
+		["单指拖动平移 · 双指捏合缩放 · 左右转90°看清被挡住的格子", 28, Color(0.9, 0.9, 0.95)],
 		["从背后、侧面、高处攻击伤害更高；行动后自动面向攻击目标。", 28, Color(0.9, 0.9, 0.95)],
 		["深水无法涉足，请走浅滩或木桥；夹住敌人可触发夹击追击。", 28, Color(0.9, 0.9, 0.95)],
-	], [["开始战斗", _start_battle]])
+	], [["开始战斗", func():
+		AudioManager.play_ui("ui_confirm")
+		_start_battle()
+	]])
 
 
 func _start_battle() -> void:
@@ -499,9 +550,14 @@ func _next_turn() -> void:
 	_set_active(u)
 	await _focus(u.pos)
 	if u.team == BattleUnit.ENEMY or Game.autoplay != "":
+		if u.team == BattleUnit.ENEMY:
+			AudioManager.play_sfx("turn_start_enemy")
+		else:
+			AudioManager.play_sfx("turn_start_ally")
 		await _ai_turn(u)
 		_next_turn.call_deferred()
 	else:
+		AudioManager.play_sfx("turn_start_ally")
 		_banner("%s 的回合" % u.name, Color(0.7, 0.85, 1.0), 0.45)
 		_enter_main()
 
@@ -518,6 +574,7 @@ func _burn(e: Dictionary, before: Dictionary) -> void:
 	fx.number(n.body_pos() + Vector2(0, -80), str(e["amount"]), Color(1, 0.6, 0.25), false, "灼烧")
 	await _wait(0.35)
 	if e.get("killed", false):
+		AudioManager.play_sfx("unit_down")
 		await n.die().finished
 
 
@@ -553,6 +610,10 @@ func _finish(result: String) -> void:
 	preview_panel.visible = false
 	_hint("")
 	_set_active(null)
+	if result == "win":
+		AudioManager.play_sfx("victory")
+	elif result == "lose":
+		AudioManager.play_sfx("defeat")
 	if Game.autoplay != "":
 		print("AUTOPLAY %s result=%s turns=%d" % [Game.current_battle, result, state.turn_count])
 		Engine.time_scale = 1.0
@@ -605,6 +666,7 @@ func _enter_main() -> void:
 	mode = "main"
 	sel_skill = ""
 	sel_target = NONE
+	sel_ground = false
 	var u := state.current()
 	_clear_hl()
 	move_info = {}
@@ -619,7 +681,7 @@ func _enter_main() -> void:
 		_show_reach(u, stand)
 	_set_cursor(u.pos)
 	if not state.moved:
-		_hint("点击蓝色格子移动；红框内的敌人可以攻击")
+		_hint("点击蓝色格子移动；红框内的敌人可以攻击；同格再点可切换地面/单位")
 	elif not state.acted:
 		_hint("选择行动；「撤销移动」可回到原位")
 	else:
@@ -672,7 +734,8 @@ func _on_undo() -> void:
 	tw.tween_property(n, "modulate:a", 1.0, 0.12)
 	fx.glow(n.body_pos(), Color(0.6, 0.8, 1.0), 0.8, 0.25)
 	if from != u.pos:
-		fx.glow(TileNode.iso(u.pos, state.map.get_h(u.pos)) + UnitNode.BODY, Color(0.6, 0.8, 1.0), 0.8, 0.3)
+		fx.glow(view.screen(u.pos, state.map.get_h(u.pos)) + UnitNode.BODY, Color(0.6, 0.8, 1.0), 0.8, 0.3)
+	AudioManager.play_ui("ui_cancel")
 	await tw.finished
 	_refresh_all()
 	await _focus(u.pos)
@@ -706,6 +769,7 @@ func _enter_target(sid: String) -> void:
 	mode = "target"
 	sel_skill = sid
 	sel_target = NONE
+	sel_ground = false
 	_clear_hl()
 	if sk["kind"] == "self":
 		target_set = [u.pos]
@@ -723,7 +787,7 @@ func _enter_target(sid: String) -> void:
 			if o != null and (o.team == u.team) == (sk["kind"] == "heal"):
 				_set_edge(p, Color(1, 1, 0.6, 0.95))
 		preview_text.text = "[b]%s[/b]  TP%d\n%s" % [sk["name"], sk["tp"], sk["desc"]]
-		_hint("点击目标查看预测；再次点击同一目标或按「确认」执行")
+		_hint("点击目标查看预测；同格再点确认；或按「确认」执行")
 		_set_menu([["确认", _confirm, false], ["取消", _enter_main, true]], sk["name"])
 	_set_cursor(u.pos)
 	preview_panel.visible = true
@@ -731,19 +795,25 @@ func _enter_target(sid: String) -> void:
 
 func _select_target(cell: Vector2i) -> void:
 	var u := state.current()
-	if cell == sel_target and state.is_valid_target(u, sel_skill, cell):
+	# Second tap on an already-selected attack/skill target confirms; unit/ground
+	# toggle is only for inspect (_inspect), not pending targeting.
+	if cell == sel_target:
 		_confirm()
 		return
 	sel_target = cell
+	sel_ground = false
 	var sk := SkillDB.get_skill(sel_skill)
 	_clear_hl2()
 	for p in Combat.affected_tiles(sk, u.pos, cell):
 		_set_hl(p, COL_AREA, true)
+	_set_cursor(cell)
 	var entries := state.preview(u, sel_skill, cell)
 	_show_preview(sk, entries)
 	var tu := state.unit_at(cell)
 	if tu != null:
 		_show_info(tu)
+	else:
+		_show_tile_info(cell)
 	_set_menu([["确认", _confirm, state.is_valid_target(u, sel_skill, cell)], ["取消", _enter_main, true]], sk["name"])
 
 
@@ -791,6 +861,7 @@ func _confirm() -> void:
 	var u := state.current()
 	if sel_target == NONE or not state.is_valid_target(u, sel_skill, sel_target):
 		return
+	AudioManager.play_ui("ui_confirm")
 	mode = "busy"
 	_set_menu([])
 	preview_panel.visible = false
@@ -830,6 +901,7 @@ func _end_turn() -> void:
 
 
 func _cancel() -> void:
+	AudioManager.play_ui("ui_cancel")
 	match mode:
 		"target", "skills":
 			_enter_main()
@@ -858,7 +930,7 @@ func _hp_snapshot() -> Dictionary:
 
 func _tile_top(p: Vector2i) -> Vector2:
 	var h := state.map.get_h(p) if state.map.in_bounds(p) else 0
-	return TileNode.iso(p, h)
+	return view.screen(p, h)
 
 
 func _tile_body(p: Vector2i) -> Vector2:
@@ -872,10 +944,14 @@ func _animate_path(u: BattleUnit, path: Array) -> void:
 	for i in range(1, path.size()):
 		var a: Vector2i = path[i - 1]
 		var b: Vector2i = path[i]
-		var dest := TileNode.iso(b, state.map.get_h(b))
+		var dest := view.screen(b, state.map.get_h(b))
+		var terrain := state.map.get_terrain(b)
+		var from_c := a
+		var to_c := b
 		tw.tween_callback(func():
-			n.z_index = maxi(n.cell_z(a), n.cell_z(b))
-			n.sprite.flip_h = Combat.dir_toward(a, b) >= 2)
+			n.z_index = maxi(n.cell_z(from_c), n.cell_z(to_c))
+			n.sprite.flip_h = view.faces_left(Combat.dir_toward(from_c, to_c))
+			AudioManager.step_for_terrain(terrain))
 		tw.tween_property(n, "position", dest, 0.13)
 	tw.tween_callback(func():
 		n.place_at(u.pos, state.map.get_h(u.pos))
@@ -914,6 +990,7 @@ func _perform(u: BattleUnit, sid: String, tgt: Vector2i) -> void:
 	if not primary.is_empty():
 		await _wait(0.34)
 	if not dying.is_empty():
+		AudioManager.play_sfx("unit_down")
 		for d in dying:
 			unit_nodes[d.id].die()
 		await _wait(0.55)
@@ -931,7 +1008,8 @@ func _cast(u: BattleUnit, sk: Dictionary, tgt: Vector2i, primary: Array) -> void
 	var t_body := _tile_body(tgt)
 	var dir: Vector2 = (_tile_top(tgt) - n.position).normalized()
 	if dir == Vector2.ZERO:
-		dir = UnitNode.ISO_DIR[u.facing]
+		dir = view.screen_dir(u.facing)
+	AudioManager.attack_for_skill(sid)
 	match sid:
 		"slash":
 			n.lunge(dir)
@@ -1058,7 +1136,7 @@ func _cast(u: BattleUnit, sk: Dictionary, tgt: Vector2i, primary: Array) -> void
 			await fx.shield(a_body, col).finished
 		"dash":
 			fx.wind(a_body, col)
-			n.lunge(UnitNode.ISO_DIR[u.facing], 18.0)
+			n.lunge(view.screen_dir(u.facing), 18.0)
 			await _wait(0.3)
 		_:
 			n.lunge(dir)
@@ -1094,6 +1172,12 @@ func _react(e: Dictionary, att: BattleUnit, sk: Dictionary, shown: Dictionary) -
 			var tag := "背后" if side == "back" else ("侧面" if side == "side" else "")
 			var ncol := Color(1, 0.55, 0.35) if side == "back" else Color(1, 0.92, 0.45)
 			fx.number(above, str(e["amount"]), ncol, side != "front", tag)
+			if t.guard:
+				AudioManager.play_sfx("hit_block")
+			elif side == "back" or HEAVY.has(sk["id"]):
+				AudioManager.play_sfx("crit")
+			else:
+				AudioManager.play_sfx("hit_flesh")
 			if side == "back" or e.get("killed", false):
 				_shake_cam(8.0)
 		"miss":
@@ -1105,6 +1189,7 @@ func _react(e: Dictionary, att: BattleUnit, sk: Dictionary, shown: Dictionary) -
 			shown[t.id] = int(shown[t.id]) + int(e["amount"])
 			n.drain_hp(shown[t.id])
 			fx.number(above, "+%d" % e["amount"], Color(0.5, 1, 0.6))
+			AudioManager.play_sfx("heal")
 
 
 func _secondary(e: Dictionary, att: BattleUnit, shown: Dictionary) -> void:
@@ -1173,11 +1258,12 @@ func _secondary(e: Dictionary, att: BattleUnit, shown: Dictionary) -> void:
 			n.queue_redraw()
 			await _wait(0.2)
 	if e.get("killed", false) and t != null:
+		AudioManager.play_sfx("unit_down")
 		await n.die().finished
 
 
 func _focus(cell: Vector2i) -> void:
-	await _focus_world(TileNode.iso(cell, state.map.get_h(cell)) + Vector2(0, -40))
+	await _focus_world(view.screen(cell, state.map.get_h(cell)) + Vector2(0, -40))
 
 
 func _focus_world(dest: Vector2) -> void:
@@ -1294,24 +1380,25 @@ func _over_ui(pos: Vector2) -> bool:
 
 
 func _pick(screen_pos: Vector2) -> Vector2i:
+	# Grid tile under the finger — never unit sprite bounds.
 	var wp: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * screen_pos
-	var best := NONE
-	var best_z := -1
+	return view.pick(wp, state.map)
+
+
+func _rotate_cam(steps: int) -> void:
+	var focus := focus_cell if focus_cell != NONE else (state.current().pos if state.current() != null else Vector2i(state.map.width / 2, state.map.height / 2))
+	view.rotate_by(steps)
+	for p in tiles:
+		tiles[p].relayout()
 	for id in unit_nodes:
 		var n = unit_nodes[id]
-		if not n.visible:
-			continue
-		if UnitNode.SPRITE_RECT.has_point(wp - n.position) and n.z_index > best_z:
-			best_z = n.z_index
-			best = n.unit.pos
+		n.place_at(n.unit.pos, state.map.get_h(n.unit.pos))
+		n.face()
+	_set_cursor(focus)
+	cam.position = _clamp_cam(view.screen(focus, state.map.get_h(focus)) + Vector2(0, -40))
+	# Re-apply highlights after relayout (tiles keep hl colors; just redraw).
 	for p in tiles:
-		var tn = tiles[p]
-		if tn.z_index <= best_z:
-			continue
-		if tn.contains_local(wp - tn.position):
-			best_z = tn.z_index
-			best = p
-	return best
+		tiles[p].queue_redraw()
 
 
 func _on_tap(pos: Vector2) -> void:
@@ -1327,9 +1414,9 @@ func _on_tap(pos: Vector2) -> void:
 			if not state.moved and not move_info.is_empty() and (move_info["ends"] as Array).has(cell) and cell != u.pos:
 				_do_move(cell)
 				return
-			if other != null and other.team != u.team and not state.acted:
+			if other != null and other.team != u.team and not state.acted and not sel_ground:
 				var basic_targets := state.target_tiles(u, u.basic, u.pos)
-				if basic_targets.has(cell):
+				if basic_targets.has(cell) and cell != focus_cell:
 					_enter_target(u.basic)
 					_select_target(cell)
 					return
@@ -1345,15 +1432,23 @@ func _on_tap(pos: Vector2) -> void:
 
 func _inspect(cell: Vector2i, other: BattleUnit) -> void:
 	_clear_hl2()
-	if other != null:
+	if cell == focus_cell and other != null:
+		sel_ground = not sel_ground
+	else:
+		sel_ground = false
+	_set_cursor(cell)
+	if other != null and not sel_ground:
+		AudioManager.play_sfx("unit_select")
 		_show_info(other)
 		if other.team == BattleUnit.ENEMY and mode == "main":
 			var r := state.reachable_for(other)
 			for p in r["ends"]:
 				_set_hl(p, COL_DANGER, true)
-			_hint("橙色：%s 的移动范围" % other.name)
+			_hint("橙色：%s 的移动范围（再点同格查看地面）" % other.name)
 	else:
 		_show_tile_info(cell)
+		if other != null:
+			_hint("地面：%s（再点同格回到单位）" % Terrain.info(state.map.get_terrain(cell))["name"])
 
 
 func _do_move(cell: Vector2i) -> void:
@@ -1397,7 +1492,7 @@ func _setup_shot() -> void:
 	lord.tp = 3
 	_refresh_all()
 	_set_active(lord)
-	cam.position = _clamp_cam(TileNode.iso(lord.pos, state.map.get_h(lord.pos)) + Vector2(0, -120))
+	cam.position = _clamp_cam(view.screen(lord.pos, state.map.get_h(lord.pos)) + Vector2(0, -120))
 	if Game.current_battle == "b1":
 		mode = "main"
 		_enter_target(lord.basic)

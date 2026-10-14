@@ -16,11 +16,8 @@ var effect := ""
 var hl := Color(0, 0, 0, 0)
 var hl2 := Color(0, 0, 0, 0)
 var edge := Color(0, 0, 0, 0)  # outline-only highlight (attack reach beyond the move range)
-var cursor := false
-
-
-static func iso(p: Vector2i, height: int) -> Vector2:
-	return Vector2((p.x - p.y) * TW * 0.5, (p.x + p.y) * TH * 0.5 - height * HS)
+var cursor := false  # kept for API compat; outline is drawn by TileCursor above units
+var view: IsoView
 
 
 static func tex(path: String) -> Texture2D:
@@ -29,12 +26,27 @@ static func tex(path: String) -> Texture2D:
 	return textures[path]
 
 
-func setup(p: Vector2i, height: int, t: String) -> void:
+## Unrotated iso helper (yaw 0). Prefer IsoView.screen when a view exists.
+static func iso(p: Vector2i, height: int) -> Vector2:
+	return Vector2((p.x - p.y) * TW * 0.5, (p.x + p.y) * TH * 0.5 - height * HS)
+
+
+func setup(p: Vector2i, height: int, t: String, v: IsoView) -> void:
 	cell = p
 	h = height
 	terrain = t
-	position = iso(p, height)
-	z_index = (p.x + p.y) * 2
+	view = v
+	relayout()
+
+
+func relayout() -> void:
+	position = view.screen(cell, h)
+	z_index = view.tile_z(cell)
+
+
+## Hit test against the visible column (top face plus side faces), in local coordinates.
+func contains_local(l: Vector2) -> bool:
+	return view.column_contains(l, h)
 
 
 func _draw() -> void:
@@ -56,12 +68,7 @@ func _draw() -> void:
 		_diamond(Color(edge.r, edge.g, edge.b, 0.14), 0.84, edge)
 	if hl2.a > 0.0:
 		_diamond(hl2, 0.7)
-	if cursor:
-		var pts := PackedVector2Array()
-		for v in DIAMOND:
-			pts.append(v * 0.95)
-		pts.append(pts[0])
-		draw_polyline(pts, Color(1, 1, 1, 0.95), 5.0)
+	# Selected outline is drawn by TileCursor (higher z) so it stays above units.
 	if terrain == "forest":
 		var tree := tex("res://assets/tiles/deco_tree.png")
 		draw_texture(tree, Vector2(-46, -70))
@@ -111,13 +118,3 @@ func _ford() -> void:
 			stone.append(s + Vector2(cos(a) * 9.0, sin(a) * 5.0))
 		draw_colored_polygon(stone, Color(0.62, 0.6, 0.55))
 		draw_polyline(stone + PackedVector2Array([stone[0]]), Color(0.3, 0.3, 0.3, 0.7), 1.5)
-
-
-## Hit test against the visible column (top face plus side faces), in local coordinates.
-func contains_local(l: Vector2) -> bool:
-	var ax := absf(l.x)
-	if ax > 64.0:
-		return false
-	var top_edge := -32.0 + ax * 0.5
-	var bottom_edge := 32.0 - ax * 0.5 + (h + 1) * HS
-	return l.y >= top_edge and l.y <= bottom_edge

@@ -20,6 +20,7 @@ config/quit_on_go_back=false
 [autoload]
 
 Game="*res://scripts/game/game.gd"
+AudioManager="*res://scripts/game/audio_manager.gd"
 
 [display]
 

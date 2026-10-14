@@ -2,9 +2,8 @@ extends Node2D
 ## Visual for one BattleUnit: team ring, facing arrow, chibi sprite, HP bar, active marker,
 ## plus the procedural hit reactions (flash shader, shake, HP drain, death fade).
 
-const TileNode := preload("res://scripts/game/tile_node.gd")
-const ISO_DIR := [Vector2(0.894, -0.447), Vector2(0.894, 0.447), Vector2(-0.894, 0.447), Vector2(-0.894, -0.447)]
-const SPRITE_RECT := Rect2(-50, -136, 100, 150)
+const SPRITE_RECT := Rect2(-50, -178, 100, 192)  # sprite, HP bar and active marker
+const SEE_THROUGH_ALPHA := 0.32
 const SPRITE_POS := Vector2(-48, -116)
 const BODY := Vector2(0, -58)
 const FLASH_SHADER := """
@@ -20,9 +19,12 @@ void fragment() {
 static var _shader: Shader
 
 var unit: BattleUnit
+var view: IsoView
 var sprite: Sprite2D
 var mat: ShaderMaterial
 var active := false
+var see_through := false
+var _see_tw: Tween
 var t := 0.0
 var display_hp := 1.0:  # green bar; held at the pre-hit value until the hit lands
 	set(v):
@@ -34,8 +36,9 @@ var trail_hp := 1.0:  # white "damage trail" that drains after the green bar dro
 		queue_redraw()
 
 
-func setup(u: BattleUnit) -> void:
+func setup(u: BattleUnit, v: IsoView) -> void:
 	unit = u
+	view = v
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = FLASH_SHADER
@@ -52,11 +55,11 @@ func setup(u: BattleUnit) -> void:
 
 
 func cell_z(p: Vector2i) -> int:
-	return (p.x + p.y) * 2 + 1
+	return view.unit_z(p)
 
 
 func place_at(p: Vector2i, h: int) -> void:
-	position = TileNode.iso(p, h)
+	position = view.screen(p, h)
 	z_index = cell_z(p)
 
 
@@ -65,7 +68,7 @@ func body_pos() -> Vector2:
 
 
 func refresh() -> void:
-	sprite.flip_h = unit.facing == 2 or unit.facing == 3
+	sprite.flip_h = view.faces_left(unit.facing)
 	visible = unit.alive()
 	display_hp = unit.hp
 	trail_hp = unit.hp
@@ -74,8 +77,26 @@ func refresh() -> void:
 
 ## Syncs only the facing (sprite flip + arrow) without touching the HP bar mid-animation.
 func face() -> void:
-	sprite.flip_h = unit.facing == 2 or unit.facing == 3
+	sprite.flip_h = view.faces_left(unit.facing)
 	queue_redraw()
+
+
+## Fades the sprite and its HUD so the tile it hides stays readable. Uses sprite.modulate and
+## self_modulate, leaving `modulate` free for the death / undo fades.
+func set_see_through(on: bool) -> void:
+	if on == see_through:
+		return
+	see_through = on
+	if _see_tw != null:
+		_see_tw.kill()
+	var a := SEE_THROUGH_ALPHA if on else 1.0
+	_see_tw = create_tween().set_parallel(true)
+	_see_tw.tween_property(sprite, "modulate:a", a, 0.12)
+	_see_tw.tween_property(self, "self_modulate:a", a, 0.12)
+
+
+func world_rect() -> Rect2:
+	return Rect2(position + SPRITE_RECT.position, SPRITE_RECT.size)
 
 
 func hold_hp(v: int) -> void:
@@ -161,6 +182,9 @@ func die() -> Tween:
 	tw.chain().tween_callback(func():
 		visible = false
 		modulate.a = 1.0
+		see_through = false
+		sprite.modulate.a = 1.0
+		self_modulate.a = 1.0
 		sprite.position = SPRITE_POS
 		sprite.scale = Vector2.ONE
 		mat.set_shader_parameter("flash", 0.0))
@@ -189,7 +213,7 @@ func _draw() -> void:
 			outer.append(p * (1.12 + 0.06 * pulse))
 		draw_polyline(outer, Color(1, 0.9, 0.4, 0.5 + 0.4 * pulse), 3.0)
 	draw_polyline(ring, col, 4.0 if active else 3.0)
-	var v: Vector2 = ISO_DIR[unit.facing]
+	var v: Vector2 = view.screen_dir(unit.facing)
 	var perp := Vector2(-v.y, v.x)
 	var tip := Vector2(v.x * 62.0, v.y * 62.0)
 	var base := Vector2(v.x * 40.0, v.y * 40.0)

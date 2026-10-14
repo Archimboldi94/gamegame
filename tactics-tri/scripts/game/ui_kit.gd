@@ -10,7 +10,12 @@ static func button(text: String, cb: Callable, min_w := 260.0, min_h := MIN_BUTT
 	b.text = text
 	b.custom_minimum_size = Vector2(min_w, min_h)
 	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(cb, CONNECT_DEFERRED)
+	b.pressed.connect(func():
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree != null and tree.root.has_node("AudioManager"):
+			tree.root.get_node("AudioManager").play_ui("ui_tap")
+		cb.call()
+	, CONNECT_DEFERRED)
 	return b
 
 
