@@ -1,6 +1,8 @@
 # 《天平之誓》
 
-原创等距视角战术角色扮演游戏（Godot 4.3 / GDScript，安卓横屏）。全部美术、剧情与文字均为原创或程序生成，详见 `ART_LICENSE.md`。
+原创等距视角战术角色扮演游戏（Godot 4.3 / GDScript，PC 鼠标键盘与安卓横屏）。
+
+视觉采用原创波斯细密画：青金石蓝、朱砂红、翡翠绿与金色线饰，人物长袍刺绣、手稿式肖像、植物纹地表与雕刻石壁均由 Pillow 程序绘制。全部美术、剧情与文字均为原创或程序生成，详见 `ART_LICENSE.md`。
 
 ## 操作（触屏）
 
@@ -10,6 +12,24 @@
 - 单指拖动平移，双指捏合缩放（鼠标滚轮亦可）；左侧有「镜头归位 / 左转90° / 右转90° / 放大 / 缩小 / 速度」按钮。旋转后仍按脚下格子点选；挡住选中格的单位会半透明，选中格描边画在单位之上。同一格再点可在单位与地面之间切换。
 - 安卓返回键：取消当前选择或撤销移动（标题画面按返回键退出）。
 - 点击敌人可查看其移动范围（橙色）。
+
+## 操作（PC 鼠标 / 键盘）
+
+| 输入 | 功能 |
+| --- | --- |
+| 鼠标左键 | 与触屏点击相同；左键拖动也可平移 |
+| 悬停地格 | 青色细描边；显示单位生命、技力、职业与地形信息，不改变当前选择或预测目标 |
+| 右键轻点 / Esc | 取消攻击或技能选择；主菜单下撤销尚可撤销的移动（与安卓返回键一致） |
+| 中键拖动 / 右键拖动 | 平移镜头；右键拖动结束不会取消行动 |
+| 空格 / Enter | 主菜单待机；已有合法目标时确认攻击或技能；战前及结果弹窗确认默认按钮 |
+| 轻按 A / S | 攻击 / 技能（松开时触发） |
+| Z / Backspace | 撤销移动；目标或技能菜单下也可直接撤销尚未出手的移动 |
+| Q / E | 左转 / 右转 90° |
+| R | 重置朝向与缩放，镜头回到当前行动单位 |
+| + / -、小键盘加减、滚轮 | 缩放；滚轮以指针位置为中心，预测说明区仍可滚动阅读 |
+| 方向键 / 按住 WASD | 持续平移；按住 A/S 超过 180 毫秒进入平移，不触发攻击 / 技能 |
+
+A/S 同时承担行动与平移，故区分轻按和按住；方向键无需等待。快捷键忽略长按重复，确认键不会跳过目标预测或在敌方行动时结束回合。失去窗口焦点会清除拖动与按键状态。触屏单指拖动、双指捏合与安卓返回键保留。
 
 ## 规则要点
 
@@ -29,4 +49,8 @@ godot --headless --path . -s tests/run_tests.gd          # 规则测试，输出
 godot --headless --path . --export-debug Android build/tactics-tri.apk
 ```
 
-截图模式：`godot --path . -- --shot=battle --out=shots/battle.png`（可选 title / dialogue / vote / battle2a / battle2b / battlefx / ending）。
+截图模式：`godot --path . -- --shot=battle --out=shots/battle.png`（可选 title / dialogue / vote / battlemain / battle2a / battle2b / battlefx / ending）。`battle` 展示双肖像伤害预测，`battlemain` 展示移动范围与四个行动按钮。
+
+完整重建美术：`python3 tools/gen_art.py`；只更新战场、人物、肖像、界面和地格特效：`python3 tools/gen_art.py --battle-only`。共享配色和绘制函数位于 `tools/miniature.py`，生成器不读取参考图。地格为 160×80、每级高差 40，单位显示比例为 0.82；地形、光标、特效与拾取共用 `IsoView` 的尺寸。
+
+本轮视觉截图（2400×1080）：[伤害预测](shots/battle_miniature.png)、[主行动菜单](shots/battle_main_miniature.png)、[雪岭](shots/battle2a_miniature.png)、[对话肖像](shots/dialogue_miniature.png)。实现与验证记录见 [codex-miniature-summary.md](codex-miniature-summary.md)。

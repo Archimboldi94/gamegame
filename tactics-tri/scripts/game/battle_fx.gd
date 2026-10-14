@@ -8,7 +8,7 @@ var add_mat: CanvasItemMaterial
 
 
 class Shape extends Node2D:
-	const DIAMOND := [Vector2(0, -32), Vector2(64, 0), Vector2(0, 32), Vector2(-64, 0)]
+	const DIAMOND := IsoView.DIAMOND
 	var kind := ""
 	var col := Color.WHITE
 	var dir := Vector2.RIGHT

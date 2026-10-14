@@ -1,5 +1,5 @@
 extends Control
-## Dialogue scene: background, up to two silhouettes, name box, typewriter text, tap to advance,
+## Dialogue scene: miniature backdrop and portraits, name box, typewriter text, tap to advance,
 ## optional choice (records a conviction for the protagonist).
 
 const Silhouette := preload("res://scripts/game/silhouette.gd")
@@ -42,7 +42,7 @@ func _build() -> void:
 	bg.texture = load(data["bg"])
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_child(UIKit.full_rect(bg))
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.25)
@@ -194,6 +194,7 @@ func _place_speaker(who: String, sp: Dictionary) -> void:
 		right_who = who
 	target.color = sp["color"]
 	target.cls = cls
+	target.who = who
 	target.visible = true
 	sil_left.active = on_left
 	sil_right.active = not on_left

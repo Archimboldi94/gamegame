@@ -7,23 +7,24 @@ const TileNode := preload("res://scripts/game/tile_node.gd")
 const UnitNode := preload("res://scripts/game/unit_node.gd")
 const BattleFX := preload("res://scripts/game/battle_fx.gd")
 const TileCursor := preload("res://scripts/game/tile_cursor.gd")
+const UnitPanel := preload("res://scripts/game/battle_unit_panel.gd")
 
 const NONE := Vector2i(-1, -1)
-const COL_MOVE := Color(0.3, 0.6, 1.0, 0.45)
-const COL_ATTACK := Color(1.0, 0.3, 0.25, 0.42)
-const COL_REACH := Color(1.0, 0.38, 0.3, 0.95)
-const COL_HEAL := Color(0.3, 1.0, 0.5, 0.40)
-const COL_AREA := Color(1.0, 0.85, 0.3, 0.55)
-const COL_DANGER := Color(1.0, 0.45, 0.15, 0.32)
+const COL_MOVE := Color(0.40, 0.69, 0.76, 0.23)
+const COL_ATTACK := Color(0.86, 0.40, 0.25, 0.25)
+const COL_REACH := Color(0.88, 0.54, 0.35, 0.73)
+const COL_HEAL := Color(0.53, 0.80, 0.51, 0.25)
+const COL_AREA := Color(0.94, 0.80, 0.39, 0.30)
+const COL_DANGER := Color(0.90, 0.60, 0.31, 0.22)
 const COL_PLAYER := Color(0.55, 0.78, 1.0)
 const COL_ENEMY := Color(1.0, 0.55, 0.5)
 const TAG_COLORS := {"背后": "#ff7060", "侧面": "#ffb347", "夹击": "#d0a0ff", "守势": "#b0b0b0"}
 const ZOOM_MIN := 0.45
 const ZOOM_MAX := 2.2
-const ZOOM_DEFAULT := 1.1
+const ZOOM_DEFAULT := 1.0
 const DRAG_THRESHOLD := 24.0
-const MENU_W := 340.0
-const MENU_H := 100.0
+const MENU_W := 252.0
+const MENU_H := 104.0
 
 const HEAVY := ["heavy_slash", "axe", "knockback"]
 const SKILL_COL := {
@@ -43,6 +44,9 @@ var world: Node2D
 var fx: BattleFX
 var cam: Camera2D
 var tile_cursor: Node2D
+var hover_cursor: Node2D
+var hover_panel: PanelContainer
+var hover_label: Label
 var tiles := {}
 var unit_nodes := {}
 
@@ -50,10 +54,16 @@ var ui_root: Control
 var safe: Control
 var timeline_box: HBoxContainer
 var turn_label: Label
-var info_icon: TextureRect
-var info_name: RichTextLabel
-var info_hp: ProgressBar
-var info_text: RichTextLabel
+var selected_panel: BattleUnitPanel
+var target_panel: BattleUnitPanel
+var step_number: Label
+var skill_chip: PanelContainer
+var skill_label: Label
+var forecast_name: Label
+var damage_label: Label
+var hit_label: Label
+var forecast_note: Label
+var idle_forecast: VBoxContainer
 var menu_panel: PanelContainer
 var menu_title: Label
 var menu_box: VBoxContainer
@@ -64,6 +74,7 @@ var hint_label: Label
 var speed_btn: Button
 var banner: Label
 var overlay: Control
+var overlay_confirm: Callable
 var ui_blockers: Array = []
 
 var mode := "busy"
@@ -82,6 +93,12 @@ var tap_valid := false
 var dragging := false
 var pinch_d0 := 0.0
 var pinch_z0 := 1.0
+var mouse_seen := false
+var mouse_button := 0
+var mouse_start := Vector2.ZERO
+var mouse_dragged := false
+var held_keys := {}
+const KEY_PAN_DELAY_MS := 180
 
 
 func _ready() -> void:
@@ -114,21 +131,14 @@ func _build_world() -> void:
 	var sky := CanvasLayer.new()
 	sky.layer = -1
 	add_child(sky)
-	var grad := Gradient.new()
-	grad.set_color(0, def["sky"].lightened(0.25))
-	grad.set_color(1, def["sky"].darkened(0.45))
-	var gt := GradientTexture2D.new()
-	gt.gradient = grad
-	gt.fill_from = Vector2(0, 0)
-	gt.fill_to = Vector2(0, 1)
 	var bg := TextureRect.new()
-	bg.texture = gt
+	bg.texture = load("res://assets/bg/battle.png")
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	sky.add_child(UIKit.full_rect(bg))
 
 	world = Node2D.new()
-	world.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	world.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_child(world)
 	for y in state.map.height:
 		for x in state.map.width:
@@ -149,6 +159,11 @@ func _build_world() -> void:
 	tile_cursor = TileCursor.new()
 	tile_cursor.hide_cursor()
 	world.add_child(tile_cursor)
+	hover_cursor = TileCursor.new()
+	hover_cursor.color = Color(0.60, 0.91, 0.89, 0.8)
+	hover_cursor.subtle = true
+	hover_cursor.hide_cursor()
+	world.add_child(hover_cursor)
 	cam = Camera2D.new()
 	world.add_child(cam)
 	cam.zoom = Vector2.ONE * ZOOM_DEFAULT
@@ -168,108 +183,157 @@ func _build_ui() -> void:
 	ui_root.add_child(safe)
 	Game.apply_safe_area(safe)
 
-	# Layout: top row (objective / turn + timeline) · hint · middle (tools left, action menu right)
-	# · bottom row (unit info left, forecast right).
-	var layout := UIKit.vbox(10)
+	var layout := UIKit.vbox(8)
 	layout.set_anchors_preset(Control.PRESET_FULL_RECT)
 	safe.add_child(layout)
-
-	var top := UIKit.hbox(12)
+	var top := UIKit.hbox(16)
 	layout.add_child(top)
-	var head := UIKit.panel()
+	var head := UIKit.battle_panel()
 	head.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	top.add_child(head)
-	var hv := UIKit.vbox(2)
+	var hv := UIKit.vbox(3)
 	head.add_child(hv)
-	hv.add_child(UIKit.label(def["name"], 30, Color(1, 0.88, 0.6)))
-	hv.add_child(UIKit.label("胜利：" + def["win_text"], 28, Color(0.75, 0.95, 0.75)))
-	hv.add_child(UIKit.label("败北：" + def["lose_text"], 28, Color(1, 0.7, 0.65)))
+	hv.add_child(UIKit.label(def["name"], 30, UIKit.IVORY))
+	hv.add_child(UIKit.label("胜利  " + def["win_text"], 23, Color(0.73, 0.80, 0.59)))
+	hv.add_child(UIKit.label("败北  " + def["lose_text"], 21, Color(0.78, 0.65, 0.54)))
 	top.add_child(_spacer())
-	var tl := UIKit.panel()
-	tl.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top.add_child(tl)
-	var tlv := UIKit.vbox(4)
-	tl.add_child(tlv)
-	turn_label = UIKit.label("", 32, COL_PLAYER, 6)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tlv.add_child(turn_label)
-	timeline_box = UIKit.hbox(6)
-	tlv.add_child(timeline_box)
-	top.add_child(_spacer())
+	skill_chip = UIKit.battle_panel(UIKit.GOLD)
+	skill_chip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top.add_child(skill_chip)
+	var sh := UIKit.hbox(12)
+	skill_chip.add_child(sh)
+	sh.add_child(UIKit.label("◆", 32, UIKit.GOLD.lightened(0.2)))
+	skill_label = UIKit.label("", 27, UIKit.IVORY)
+	sh.add_child(skill_label)
+	skill_chip.hide()
 
-	hint_panel = PanelContainer.new()
+	var step_panel := UIKit.battle_panel()
+	step_panel.custom_minimum_size = Vector2(280, 0)
+	step_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top.add_child(step_panel)
+	var sv := UIKit.vbox(0)
+	step_panel.add_child(sv)
+	var step_row := UIKit.hbox(14)
+	sv.add_child(step_row)
+	step_row.add_child(UIKit.label("行动", 23, UIKit.GOLD.lightened(0.18)))
+	step_number = UIKit.label("01", 44, UIKit.IVORY)
+	step_number.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	step_number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	step_row.add_child(step_number)
+	turn_label = UIKit.label("", 23, UIKit.ALLY)
+	sv.add_child(turn_label)
+
+	hint_panel = UIKit.battle_panel(UIKit.GOLD, 16)
 	hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint_panel.add_theme_stylebox_override("panel", UIKit.color_box(Color(0.05, 0.05, 0.1, 0.62), 14))
-	hint_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	hint_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	layout.add_child(hint_panel)
-	hint_label = UIKit.label("", 30, Color(1, 1, 1))
+	hint_label = UIKit.label("", 23, UIKit.IVORY)
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_panel.add_child(hint_label)
 
 	var mid := UIKit.hbox(12)
 	mid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(mid)
-	var tools := UIKit.vbox(10)
-	tools.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var tools := GridContainer.new()
+	tools.columns = 2
+	tools.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tools.add_theme_constant_override("h_separation", 6)
+	tools.add_theme_constant_override("v_separation", 6)
+	tools.size_flags_vertical = Control.SIZE_SHRINK_END
 	mid.add_child(tools)
-	var b_center := UIKit.button("镜头归位", _recenter, 170, 96)
-	var b_rot_l := UIKit.button("左转90°", _rotate_cam.bind(-1), 170, 96)
-	var b_rot_r := UIKit.button("右转90°", _rotate_cam.bind(1), 170, 96)
-	var b_in := UIKit.button("放大", _zoom_step.bind(1.2), 170, 96)
-	var b_out := UIKit.button("缩小", _zoom_step.bind(1.0 / 1.2), 170, 96)
-	speed_btn = UIKit.button("速度×1", _toggle_speed, 170, 96)
-	for b in [b_center, b_rot_l, b_rot_r, b_in, b_out, speed_btn]:
-		b.add_theme_font_size_override("font_size", 30)
+	var b_center := UIKit.battle_button("归位", _recenter, 112, 96)
+	var b_rot_l := UIKit.battle_button("左转", _rotate_cam.bind(-1), 112, 96)
+	var b_rot_r := UIKit.battle_button("右转", _rotate_cam.bind(1), 112, 96)
+	var b_in := UIKit.battle_button("放大", _zoom_step.bind(1.2), 112, 96)
+	var b_out := UIKit.battle_button("缩小", _zoom_step.bind(1.0 / 1.2), 112, 96)
+	speed_btn = UIKit.battle_button("速度×1", _toggle_speed, 112, 96)
+	for b in [b_center, speed_btn, b_rot_l, b_rot_r, b_out, b_in]:
+		b.add_theme_font_size_override("font_size", 24)
 		tools.add_child(b)
 	mid.add_child(_spacer())
-	menu_panel = UIKit.panel()
-	menu_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	menu_panel = UIKit.battle_panel()
+	menu_panel.size_flags_vertical = Control.SIZE_SHRINK_END
 	mid.add_child(menu_panel)
-	var mv := UIKit.vbox(10)
+	var mv := UIKit.vbox(8)
 	menu_panel.add_child(mv)
-	menu_title = UIKit.label("", 30, Color(1, 0.88, 0.6))
+	menu_title = UIKit.label("", 23, UIKit.GOLD.lightened(0.18))
 	menu_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mv.add_child(menu_title)
-	menu_box = UIKit.vbox(10)
+	menu_box = UIKit.vbox(8)
 	mv.add_child(menu_box)
 	menu_panel.visible = false
 
-	var bottom := UIKit.hbox(12)
+	# Mirrored portraits frame a single, prominent damage / hit forecast.
+	var bottom := UIKit.hbox(10)
 	layout.add_child(bottom)
-	var info := UIKit.panel()
-	info.size_flags_vertical = Control.SIZE_SHRINK_END
-	bottom.add_child(info)
-	var ih := UIKit.hbox(14)
-	info.add_child(ih)
-	info_icon = TextureRect.new()
-	info_icon.custom_minimum_size = Vector2(96, 96)
-	info_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	info_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	info_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	info_icon.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	ih.add_child(info_icon)
-	var iv := UIKit.vbox(4)
-	ih.add_child(iv)
-	info_name = UIKit.rich(30)
-	info_name.custom_minimum_size = Vector2(540, 0)
-	iv.add_child(info_name)
-	info_hp = ProgressBar.new()
-	info_hp.show_percentage = false
-	info_hp.custom_minimum_size = Vector2(540, 20)
-	info_hp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info_hp.add_theme_stylebox_override("background", UIKit.color_box(Color(0, 0, 0, 0.7), 6))
-	iv.add_child(info_hp)
-	info_text = UIKit.rich(28)
-	info_text.custom_minimum_size = Vector2(540, 0)
-	iv.add_child(info_text)
-	bottom.add_child(_spacer())
-	preview_panel = UIKit.panel()
-	preview_panel.size_flags_vertical = Control.SIZE_SHRINK_END
-	bottom.add_child(preview_panel)
-	preview_text = UIKit.rich(30)
-	preview_text.custom_minimum_size = Vector2(760, 0)
-	preview_panel.add_child(preview_text)
-	preview_panel.visible = false
+	selected_panel = UnitPanel.new()
+	selected_panel.build("选中单位 / 出手方")
+	bottom.add_child(selected_panel)
+	var center := UIKit.battle_panel()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.custom_minimum_size = Vector2(440, 216)
+	bottom.add_child(center)
+	var stack := Control.new()
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(stack)
+	idle_forecast = UIKit.vbox(8)
+	idle_forecast.set_anchors_preset(Control.PRESET_FULL_RECT)
+	idle_forecast.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_child(idle_forecast)
+	for text in ["◆  天 平 之 誓  ◆", "移动 · 选择行动 · 确认目标"]:
+		var l := UIKit.label(text, 27 if text.begins_with("◆") else 22, UIKit.GOLD if text.begins_with("◆") else UIKit.MUTED)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		idle_forecast.add_child(l)
+	preview_panel = PanelContainer.new()
+	preview_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	preview_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(preview_panel)
+	var pv := UIKit.vbox(2)
+	preview_panel.add_child(pv)
+	forecast_name = UIKit.label("", 23, UIKit.GOLD.lightened(0.18))
+	forecast_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pv.add_child(forecast_name)
+	var values := UIKit.hbox(18)
+	values.alignment = BoxContainer.ALIGNMENT_CENTER
+	pv.add_child(values)
+	damage_label = UIKit.label("", 52, UIKit.IVORY, 2)
+	values.add_child(damage_label)
+	hit_label = UIKit.label("", 30, UIKit.ALLY)
+	hit_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	values.add_child(hit_label)
+	forecast_note = UIKit.label("", 21, UIKit.MUTED)
+	forecast_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pv.add_child(forecast_note)
+	preview_text = UIKit.rich(21)
+	preview_text.fit_content = false
+	preview_text.scroll_active = true
+	preview_text.mouse_filter = Control.MOUSE_FILTER_STOP
+	preview_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview_text.custom_minimum_size = Vector2(400, 70)
+	pv.add_child(preview_text)
+	preview_panel.hide()
+	target_panel = UnitPanel.new()
+	target_panel.build("目标 / 受击方", true)
+	bottom.add_child(target_panel)
+
+	var timeline := UIKit.battle_panel(UIKit.GOLD, 12)
+	layout.add_child(timeline)
+	var th := UIKit.hbox(14)
+	timeline.add_child(th)
+	var caption := UIKit.vbox(2)
+	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	th.add_child(caption)
+	caption.add_child(UIKit.label("行动顺序", 23, UIKit.IVORY))
+	caption.add_child(UIKit.label("接下来八手", 18, UIKit.MUTED))
+	timeline_box = UIKit.hbox(6)
+	timeline_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	th.add_child(timeline_box)
+	var legend := UIKit.vbox(4)
+	legend.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	th.add_child(legend)
+	legend.add_child(UIKit.label("● 我方   ● 敌方", 20, UIKit.MUTED))
+	legend.add_child(UIKit.label("同格再点：单位 / 地面", 18, UIKit.GOLD))
 
 	banner = UIKit.label("", 68, Color(1, 0.92, 0.6), 16)
 	banner.set_anchors_preset(Control.PRESET_CENTER)
@@ -278,8 +342,14 @@ func _build_ui() -> void:
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.modulate.a = 0.0
 	safe.add_child(banner)
-
-	ui_blockers = [head, tl, b_center, b_rot_l, b_rot_r, b_in, b_out, speed_btn, info, menu_panel, preview_panel]
+	ui_blockers = [head, step_panel, skill_chip, b_center, b_rot_l, b_rot_r, b_in, b_out, speed_btn, selected_panel, target_panel, menu_panel, center, timeline]
+	hover_panel = UIKit.battle_panel(UIKit.ALLY, 12)
+	hover_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hover_panel.z_index = 10
+	ui_root.add_child(hover_panel)
+	hover_label = UIKit.label("", 21, UIKit.IVORY)
+	hover_panel.add_child(hover_label)
+	hover_panel.hide()
 
 
 func _spacer() -> Control:
@@ -317,78 +387,73 @@ func _refresh_timeline() -> void:
 	var cur := state.current()
 	if cur != null:
 		var player := cur.team == BattleUnit.PLAYER
-		turn_label.text = "第 %d 手 · %s：%s" % [state.turn_count, "我方回合" if player else "敌方回合", cur.name]
-		turn_label.add_theme_color_override("font_color", COL_PLAYER if player else COL_ENEMY)
+		step_number.text = "%02d" % state.turn_count
+		turn_label.text = "%s · %s" % ["我方回合" if player else "敌方回合", cur.name]
+		turn_label.add_theme_color_override("font_color", UIKit.ALLY if player else UIKit.FOE)
 	var ids := state.turn_preview(8)
 	for i in ids.size():
 		var u := state.unit_by_id(ids[i])
 		if u == null:
 			continue
-		var chip := PanelContainer.new()
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var col := Color(0.18, 0.32, 0.66, 0.92) if u.team == BattleUnit.PLAYER else Color(0.62, 0.18, 0.18, 0.92)
 		var now := i == 0 and state.current_id == u.id
-		chip.add_theme_stylebox_override("panel", UIKit.color_box(col, 10, Color(1, 0.85, 0.4), 5 if now else 0))
-		chip.custom_minimum_size = Vector2(116, 0)
-		var v := UIKit.vbox(0)
-		chip.add_child(v)
+		var col := UIKit.ALLY if u.team == BattleUnit.PLAYER else UIKit.FOE
+		var chip := UIKit.battle_panel(UIKit.GOLD.lightened(0.3) if now else col.darkened(0.3), 8)
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var row := UIKit.hbox(6)
+		chip.add_child(row)
 		var icon := TextureRect.new()
-		icon.texture = load("res://assets/icons/%s.png" % u.cls)
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
-		icon.custom_minimum_size = Vector2(48, 48)
-		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		v.add_child(icon)
-		var l := UIKit.label(u.name, 28)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(l)
+		icon.texture = load("res://assets/units/%s_%s.png" % [u.cls, "player" if u.team == BattleUnit.PLAYER else "enemy"])
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(40, 56)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+		var text := UIKit.vbox(0)
+		text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(text)
+		text.add_child(UIKit.label("行动中" if now else "%02d" % (i + 1), 16, UIKit.GOLD if now else UIKit.MUTED))
+		text.add_child(UIKit.label(u.name, 21, col))
 		timeline_box.add_child(chip)
 
 
 func _show_info(u: BattleUnit) -> void:
-	var col := "#8ab8ff" if u.team == BattleUnit.PLAYER else "#ff8a80"
-	info_icon.texture = load("res://assets/icons/%s.png" % u.cls)
-	info_icon.visible = true
-	var tp := "●".repeat(u.tp) + "○".repeat(u.max_tp - u.tp)
-	info_name.text = "[b][color=%s]%s[/color][/b]  %s · %s" % [col, u.name, u.class_label(), u.title]
-	var ratio := float(u.hp) / float(u.max_hp)
-	info_hp.max_value = u.max_hp
-	info_hp.value = u.hp
-	info_hp.visible = true
-	var bar := Color(0.35, 0.9, 0.4) if ratio > 0.5 else (Color(1.0, 0.8, 0.25) if ratio > 0.25 else Color(1.0, 0.3, 0.25))
-	info_hp.add_theme_stylebox_override("fill", UIKit.color_box(bar, 6))
-	var t := "HP [color=#9f9]%d[/color]/%d    TP [color=#8cf]%s[/color]%s\n" % [
-		u.hp, u.max_hp, tp, "   [color=#ffd27a][守势][/color]" if u.guard else ""]
-	t += "攻%d 防%d 魔%d 抗%d 速%d  移%d 跳%d  朝向%s\n" % [
-		u.atk, u.def, u.mag, u.res, u.spd, u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing]]
-	t += _terrain_text(u.pos)
-	info_text.text = t
+	if mode == "target" and u != state.current():
+		target_panel.show_unit(u, state.map)
+	else:
+		selected_panel.show_unit(u, state.map)
 
 
 func _show_tile_info(p: Vector2i) -> void:
-	info_icon.visible = false
-	info_hp.visible = false
-	info_name.text = "[b]%s[/b]" % Terrain.info(state.map.get_terrain(p))["name"]
-	info_text.text = _terrain_text(p)
+	if mode == "target":
+		target_panel.show_ground(p, state.map)
+	else:
+		selected_panel.show_ground(p, state.map)
 
 
-func _terrain_text(p: Vector2i) -> String:
-	var tinfo := Terrain.info(state.map.get_terrain(p))
-	if not tinfo["pass"]:
-		return "地形：%s  高度%d  [color=#ff9a80]无法进入[/color]%s" % [
-			tinfo["name"], state.map.get_h(p), "（仅飞行单位可越过）" if tinfo.get("fly", false) else ""]
-	var eva := state.map.evasion(p)
-	var eff := state.map.effect_at(p)
-	var s := "地形：%s  高度%d  消耗%d  回避%s%d" % [tinfo["name"], state.map.get_h(p), state.map.move_cost(p), "+" if eva >= 0 else "", eva]
-	if eff != "":
-		s += "  [color=#ffb060]%s[/color]" % Terrain.EFFECT_NAMES[eff]
-	return s
+func _clear_preview() -> void:
+	preview_panel.hide()
+	idle_forecast.show()
+	target_panel.show_empty()
+	skill_chip.hide()
+
+
+func _skill_heading(sk: Dictionary) -> void:
+	idle_forecast.hide()
+	preview_panel.show()
+	skill_label.text = "%s  ·  技力 %d" % [sk["name"], sk["tp"]]
+	skill_chip.show()
+	forecast_name.text = "%s  ·  技力消耗 %d" % [sk["name"], sk["tp"]]
+	damage_label.text = ""
+	hit_label.text = ""
+	forecast_note.text = "选择目标查看预测"
 
 
 ## items: [[text, callable, enabled], ...]
 func _set_menu(items: Array, title := "") -> void:
 	UIKit.clear(menu_box)
 	for it in items:
-		var b := UIKit.button(it[0], it[1], MENU_W, MENU_H)
+		var b := UIKit.battle_button(it[0], it[1], MENU_W, MENU_H)
 		b.disabled = not it[2]
 		menu_box.add_child(b)
 	menu_title.text = title
@@ -459,16 +524,19 @@ func _update_occlusion(cell: Vector2i) -> void:
 		return
 	var tile_top := view.screen(cell, state.map.get_h(cell))
 	var tile_z := view.tile_z(cell)
-	var diamond := Rect2(tile_top + Vector2(-64, -32), Vector2(128, 64))
+	var diamond := Rect2(tile_top + Vector2(-IsoView.TW * 0.5, -IsoView.TH * 0.5), Vector2(IsoView.TW, IsoView.TH))
 	for id in unit_nodes:
 		var n = unit_nodes[id]
 		if not n.visible or not n.unit.alive():
 			n.set_see_through(false)
 			continue
-		var covers: bool = n.unit.pos == cell
-		if not covers and n.z_index >= tile_z:
+		# Forecast subjects remain readable. Ground inspection still fades the
+		# occupant; other sprites covering the focused diamond keep the fade.
+		var subject: bool = mode == "target" and (n.unit == state.current() or n.unit.pos == sel_target)
+		var covers: bool = n.unit.pos == cell and sel_ground
+		if not subject and n.unit.pos != cell and n.z_index >= tile_z:
 			covers = n.world_rect().intersects(diamond)
-		n.set_see_through(covers)
+		n.set_see_through(covers and not subject)
 
 
 func _set_active(u: BattleUnit) -> void:
@@ -581,7 +649,7 @@ func _burn(e: Dictionary, before: Dictionary) -> void:
 func _ai_turn(u: BattleUnit) -> void:
 	mode = "busy"
 	_set_menu([])
-	preview_panel.visible = false
+	_clear_preview()
 	_hint("敌方行动中……" if u.team == BattleUnit.ENEMY else "自动演示中……")
 	_show_info(u)
 	await _wait(0.25)
@@ -607,7 +675,7 @@ func _ai_turn(u: BattleUnit) -> void:
 func _finish(result: String) -> void:
 	mode = "result"
 	_set_menu([])
-	preview_panel.visible = false
+	_clear_preview()
 	_hint("")
 	_set_active(null)
 	if result == "win":
@@ -632,6 +700,7 @@ func _finish(result: String) -> void:
 
 
 func _overlay_panel(lines: Array, buttons: Array) -> Control:
+	overlay_confirm = buttons[0][1] if not buttons.is_empty() else Callable()
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -659,7 +728,7 @@ func _overlay_panel(lines: Array, buttons: Array) -> Control:
 # ================================================================== player states
 
 func _menu_title(u: BattleUnit) -> String:
-	return "%s  TP %d/%d" % [u.name, u.tp, u.max_tp]
+	return "%s  ·  技力 %d/%d" % [u.name, u.tp, u.max_tp]
 
 
 func _enter_main() -> void:
@@ -681,19 +750,19 @@ func _enter_main() -> void:
 		_show_reach(u, stand)
 	_set_cursor(u.pos)
 	if not state.moved:
-		_hint("点击蓝色格子移动；红框内的敌人可以攻击；同格再点可切换地面/单位")
+		_hint("蓝色格可移动 · 红框为攻击范围 · 同格再点切换地面 / 单位")
 	elif not state.acted:
 		_hint("选择行动；「撤销移动」可回到原位")
 	else:
 		_hint("可以继续移动，或「待机」结束回合")
 	var basic := SkillDB.get_skill(u.basic)
 	_set_menu([
-		["攻击 · %s" % basic["name"], _on_attack, not state.acted],
+		["攻击  ·  %s" % basic["name"], _on_attack, not state.acted],
 		["技能", _on_skills, not state.acted],
 		["撤销移动", _on_undo, state.can_undo_move()],
-		["待机（结束）", _end_turn, true],
+		["待机", _end_turn, true],
 	], _menu_title(u))
-	preview_panel.visible = false
+	_clear_preview()
 	_show_info(u)
 
 
@@ -750,14 +819,21 @@ func _on_skills() -> void:
 	var u := state.current()
 	_set_cursor(u.pos)
 	var items := []
-	var desc := "[b]%s 的技能[/b]   当前TP %d\n" % [u.name, u.tp]
+	var desc := "[b]%s 的技能[/b]   当前技力 %d\n" % [u.name, u.tp]
 	for sid in u.skills:
 		var sk := SkillDB.get_skill(sid)
 		var ok := state.skill_usable(u, sid)
-		items.append(["%s  TP%d" % [sk["name"], sk["tp"]], _enter_target.bind(sid), ok])
-		desc += "[color=#ffd27a]%s[/color] (TP%d)%s：%s\n" % [sk["name"], sk["tp"], "" if ok else "[color=#ff8080]TP不足[/color]", sk["desc"]]
+		items.append(["%s  ·  技力%d" % [sk["name"], sk["tp"]], _enter_target.bind(sid), ok])
+		desc += "[color=#ffd27a]%s[/color] (技力%d)%s：%s\n" % [sk["name"], sk["tp"], "" if ok else "[color=#ff8080]技力不足[/color]", sk["desc"]]
 	items.append(["返回", _enter_main, true])
 	_set_menu(items, _menu_title(u))
+	idle_forecast.hide()
+	skill_chip.hide()
+	target_panel.show_empty()
+	forecast_name.text = "选择技能"
+	damage_label.text = ""
+	hit_label.text = ""
+	forecast_note.text = ""
 	preview_text.text = desc.strip_edges()
 	preview_panel.visible = true
 	_hint("选择要使用的技能")
@@ -771,11 +847,16 @@ func _enter_target(sid: String) -> void:
 	sel_target = NONE
 	sel_ground = false
 	_clear_hl()
+	selected_panel.show_unit(u, state.map)
+	target_panel.show_empty()
+	_skill_heading(sk)
 	if sk["kind"] == "self":
 		target_set = [u.pos]
 		sel_target = u.pos
 		_set_hl(u.pos, COL_AREA)
-		preview_text.text = "[b]%s[/b]  TP%d\n%s" % [sk["name"], sk["tp"], sk["desc"]]
+		preview_text.text = sk["desc"]
+		forecast_note.text = "作用于自身 · 确认后立即生效"
+		target_panel.show_unit(u, state.map)
 		_hint("确认后立即生效")
 		_set_menu([["确认", _confirm, true], ["取消", _enter_main, true]], sk["name"])
 	else:
@@ -786,7 +867,7 @@ func _enter_target(sid: String) -> void:
 			var o := state.unit_at(p)
 			if o != null and (o.team == u.team) == (sk["kind"] == "heal"):
 				_set_edge(p, Color(1, 1, 0.6, 0.95))
-		preview_text.text = "[b]%s[/b]  TP%d\n%s" % [sk["name"], sk["tp"], sk["desc"]]
+		preview_text.text = sk["desc"]
 		_hint("点击目标查看预测；同格再点确认；或按「确认」执行")
 		_set_menu([["确认", _confirm, false], ["取消", _enter_main, true]], sk["name"])
 	_set_cursor(u.pos)
@@ -810,40 +891,50 @@ func _select_target(cell: Vector2i) -> void:
 	var entries := state.preview(u, sel_skill, cell)
 	_show_preview(sk, entries)
 	var tu := state.unit_at(cell)
-	if tu != null:
-		_show_info(tu)
-	else:
+	if tu == null and entries.is_empty():
 		_show_tile_info(cell)
 	_set_menu([["确认", _confirm, state.is_valid_target(u, sel_skill, cell)], ["取消", _enter_main, true]], sk["name"])
 
 
 func _show_preview(sk: Dictionary, entries: Array) -> void:
-	var t := "[b]%s[/b]  TP%d\n" % [sk["name"], sk["tp"]]
+	_skill_heading(sk)
+	var t := ""
+	var primary: Dictionary = {}
+	for e in entries:
+		if primary.is_empty() or e["unit"].pos == sel_target:
+			primary = e
 	if entries.is_empty():
-		t += "范围内没有可作用的目标。"
+		damage_label.text = "—"
+		forecast_note.text = "范围内没有可作用的目标"
+	else:
+		var tu: BattleUnit = primary["unit"]
+		var heal: bool = primary["heal"]
+		var amount := mini(int(primary["dmg"]), tu.max_hp - tu.hp) if heal else int(primary["dmg"])
+		var after := mini(tu.max_hp, tu.hp + amount) if heal else maxi(0, tu.hp - amount)
+		damage_label.text = "%s%d" % ["+" if heal else "−", amount]
+		damage_label.add_theme_color_override("font_color", Color(0.68, 0.83, 0.52) if heal else UIKit.IVORY)
+		hit_label.text = "恢复生命" if heal else "命中 %d%%" % primary["hit"]
+		forecast_note.text = "%s · 生命 %d → %d%s" % [tu.name, tu.hp, after, " · 可击倒" if after == 0 else ""]
+		target_panel.show_unit(tu, state.map, after)
 	for e in entries:
 		var tu: BattleUnit = e["unit"]
-		if e["heal"]:
-			var amount := mini(int(e["dmg"]), tu.max_hp - tu.hp)
-			t += "%s  恢复 [color=#80ff90]%d[/color]   HP %d→%d\n" % [tu.name, amount, tu.hp, tu.hp + amount]
-			continue
-		var after := maxi(0, tu.hp - int(e["dmg"]))
-		t += "%s  伤害 [color=#ffe070]%d[/color]  命中 [color=#90d0ff]%d%%[/color]   HP %d→%d%s\n" % [
-			tu.name, e["dmg"], e["hit"], tu.hp, after, "  [color=#ff7060]可击倒[/color]" if after == 0 else ""]
+		if e != primary:
+			var amount := mini(int(e["dmg"]), tu.max_hp - tu.hp) if e["heal"] else int(e["dmg"])
+			var after := mini(tu.max_hp, tu.hp + amount) if e["heal"] else maxi(0, tu.hp - amount)
+			t += "%s  %s%d  ·  生命%d→%d  %s\n" % [tu.name, "恢复" if e["heal"] else "伤害", amount, tu.hp, after, "" if e["heal"] else "命中%d%%" % e["hit"]]
 		var tags: Array = e["labels"]
 		if not tags.is_empty():
 			var parts := []
 			for tag in tags:
-				parts.append("[color=%s]【%s】[/color]" % [_tag_color(tag), tag])
-			t += "   " + " ".join(parts) + "\n"
+				parts.append("[color=%s]%s[/color]" % [_tag_color(tag), tag])
+			t += " · ".join(parts) + "\n"
 		if e.has("pincer"):
-			t += "   夹击追击：[color=#d0a0ff]%s[/color] 伤害%d 命中%d%%\n" % [e["pincer"].name, e["pincer_dmg"], e["pincer_hit"]]
+			t += "夹击追击  [color=#d0b9da]%s[/color]  ·  伤害%d  命中%d%%\n" % [e["pincer"].name, e["pincer_dmg"], e["pincer_hit"]]
 	if sk["effect"] == "fire":
-		t += "[color=#ffb060]地面将燃烧：站在火上的单位回合开始时受伤[/color]"
+		t += "[color=#e7b577]地面燃烧：回合开始时受到灼烧伤害[/color]"
 	elif sk["effect"] == "ice":
-		t += "[color=#a0e0ff]地面将结冰（浅滩更易通行）；被击中者行动迟缓[/color]"
+		t += "[color=#a0d1ce]地面结冰，浅滩更易通行；目标行动迟缓[/color]"
 	preview_text.text = t.strip_edges()
-	preview_panel.visible = true
 
 
 func _tag_color(tag: String) -> String:
@@ -864,7 +955,7 @@ func _confirm() -> void:
 	AudioManager.play_ui("ui_confirm")
 	mode = "busy"
 	_set_menu([])
-	preview_panel.visible = false
+	_clear_preview()
 	_hint("")
 	_clear_hl()
 	var sk := SkillDB.get_skill(sel_skill)
@@ -890,7 +981,7 @@ func _end_turn() -> void:
 	mode = "busy"
 	_set_menu([])
 	_clear_hl()
-	preview_panel.visible = false
+	_clear_preview()
 	_hint("")
 	var u := state.current()
 	state.end_turn()
@@ -917,6 +1008,9 @@ func _notification(what: int) -> void:
 		touches.clear()
 		dragging = false
 		tap_valid = false
+		mouse_button = 0
+		held_keys.clear()
+		mouse_seen = false
 
 
 # ================================================================== animation
@@ -1198,10 +1292,10 @@ func _secondary(e: Dictionary, att: BattleUnit, shown: Dictionary) -> void:
 	match e["type"]:
 		"steal":
 			var by: BattleUnit = e["by"]
-			fx.number(n.body_pos() + Vector2(0, -78), "TP -%d" % e["amount"], Color(0.6, 0.85, 1.0))
+			fx.number(n.body_pos() + Vector2(0, -78), "技力 -%d" % e["amount"], Color(0.6, 0.85, 1.0))
 			await fx.projectile(n.body_pos(), unit_nodes[by.id].body_pos(), "orb", Color(0.5, 0.8, 1.0))
 			unit_nodes[by.id].flash(Color(0.5, 0.8, 1.0), 0.6, 0.2)
-			fx.number(unit_nodes[by.id].body_pos() + Vector2(0, -78), "TP +%d" % e["amount"], Color(0.6, 0.85, 1.0))
+			fx.number(unit_nodes[by.id].body_pos() + Vector2(0, -78), "技力 +%d" % e["amount"], Color(0.6, 0.85, 1.0))
 			n.queue_redraw()
 			unit_nodes[by.id].queue_redraw()
 			await _wait(0.15)
@@ -1287,13 +1381,151 @@ func _zoom_step(f: float) -> void:
 
 # ================================================================== input / camera
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if cam_follow != null:
 		cam.position = cam.position.lerp(_clamp_cam(cam_follow.position + Vector2(0, -40)), 0.2)
+	if overlay == null and not held_keys.is_empty():
+		var pan := Vector2.ZERO
+		for key in held_keys:
+			# A/S taps are actions; holding them joins WASD panning.
+			if key in [KEY_A, KEY_S] and Time.get_ticks_msec() - int(held_keys[key]) < KEY_PAN_DELAY_MS:
+				continue
+			match key:
+				KEY_A, KEY_LEFT: pan.x -= 1.0
+				KEY_D, KEY_RIGHT: pan.x += 1.0
+				KEY_W, KEY_UP: pan.y -= 1.0
+				KEY_S, KEY_DOWN: pan.y += 1.0
+		if pan != Vector2.ZERO:
+			# A/S used with another pan key belong to that gesture, even if
+			# released quickly; a diagonal pan must not open an action menu.
+			for key in [KEY_A, KEY_S]:
+				if held_keys.has(key):
+					held_keys[key] = mini(int(held_keys[key]), Time.get_ticks_msec() - KEY_PAN_DELAY_MS)
+			_pan(-pan.normalized() * 640.0 * delta / Engine.time_scale)
+	_update_hover()
+
+
+## Global releases finish gestures even when the pointer ends over the HUD.
+## Presses go through unhandled input so GUI buttons keep their own clicks.
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		if _desktop_key(event):
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and event.device != -1:
+		mouse_seen = true
+		if mouse_button != 0:
+			if event.position.distance_to(mouse_start) > DRAG_THRESHOLD:
+				mouse_dragged = true
+			if mouse_dragged:
+				_pan(event.relative)
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.device != -1 and not event.pressed:
+		if event.button_index == mouse_button:
+			var released := mouse_button
+			mouse_button = 0
+			if not mouse_dragged:
+				if released == MOUSE_BUTTON_LEFT:
+					_on_tap(event.position)
+				elif released == MOUSE_BUTTON_RIGHT:
+					_cancel()
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.device != -1 and event.pressed:
+		# Right cancel and middle/right drag also work over the side menu.
+		if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE] and overlay == null and mouse_button == 0:
+			mouse_seen = true
+			mouse_button = event.button_index
+			mouse_start = event.position
+			mouse_dragged = false
+			get_viewport().set_input_as_handled()
+
+
+func _desktop_key(event: InputEventKey) -> bool:
+	var key := event.physical_keycode if event.physical_keycode != 0 else event.keycode
+	if event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+		if not event.pressed:
+			held_keys.erase(key)
+		return false
+	var bindings := [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE, KEY_A, KEY_S, KEY_Z, KEY_BACKSPACE, KEY_Q, KEY_E, KEY_R, KEY_PLUS, KEY_EQUAL, KEY_KP_ADD, KEY_MINUS, KEY_KP_SUBTRACT, KEY_W, KEY_D, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
+	if not bindings.has(key):
+		return false
+	if event.echo:
+		return true
+	if not event.pressed:
+		var started: int = held_keys.get(key, -1)
+		held_keys.erase(key)
+		if started >= 0 and key in [KEY_A, KEY_S] and Time.get_ticks_msec() - started < KEY_PAN_DELAY_MS and overlay == null:
+			if key == KEY_A and mode == "main" and not state.acted:
+				_on_attack()
+			elif key == KEY_S and mode in ["main", "target"] and not state.acted:
+				_on_skills()
+		return true
+	held_keys[key] = Time.get_ticks_msec()
+	if overlay != null:
+		if key in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER] and overlay_confirm.is_valid():
+			overlay_confirm.call()
+		return true
+	match key:
+		KEY_ESCAPE:
+			_cancel()
+		KEY_SPACE, KEY_ENTER, KEY_KP_ENTER:
+			if mode == "target":
+				_confirm()
+			elif mode == "main":
+				_end_turn()
+		KEY_Z, KEY_BACKSPACE:
+			if mode in ["main", "target", "skills"] and state.can_undo_move():
+				if mode != "main":
+					_enter_main()
+				_on_undo()
+		KEY_Q, KEY_E:
+			if mode != "busy":
+				_rotate_cam(-1 if key == KEY_Q else 1)
+		KEY_R:
+			if mode != "busy":
+				_reset_camera()
+		KEY_PLUS, KEY_EQUAL, KEY_KP_ADD:
+			_zoom_step(1.1)
+		KEY_MINUS, KEY_KP_SUBTRACT:
+			_zoom_step(1.0 / 1.1)
+	return true
+
+
+func _reset_camera() -> void:
+	cam_follow = null
+	if view.yaw != 0:
+		_rotate_cam(-view.yaw)
+	cam.zoom = Vector2.ONE * ZOOM_DEFAULT
+	_recenter()
+
+
+func _update_hover() -> void:
+	if hover_cursor == null or hover_panel == null:
+		return
+	var pos := get_viewport().get_mouse_position()
+	if not mouse_seen or mouse_button != 0 or not touches.is_empty() or mode == "busy" or _over_ui(pos):
+		hover_cursor.hide_cursor()
+		hover_panel.hide()
+		return
+	var cell := _pick(pos)
+	if cell == NONE:
+		hover_cursor.hide_cursor()
+		hover_panel.hide()
+		return
+	hover_cursor.show_at(view.screen(cell, state.map.get_h(cell)), view.cursor_z(cell) + 1)
+	var unit := state.unit_at(cell)
+	var ground := "%s · 高度%d · 回避%+d" % [Terrain.info(state.map.get_terrain(cell))["name"], state.map.get_h(cell), state.map.evasion(cell)]
+	hover_label.text = "%s · %s · %s\n生命 %d/%d · 技力%d/%d\n%s" % [unit.name, unit.class_label(), "我方" if unit.team == BattleUnit.PLAYER else "敌方", unit.hp, unit.max_hp, unit.tp, unit.max_tp, ground] if unit != null else ground
+	hover_panel.reset_size()
+	var extent := get_viewport().get_visible_rect().size
+	hover_panel.position = (pos + Vector2(22, 22)).clamp(Vector2(24, 24), (extent - hover_panel.size - Vector2(24, 24)).max(Vector2(24, 24)))
+	hover_panel.show()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
+		if event.device == -1:  # Native mouse below owns its emulated touch.
+			return
+		mouse_seen = false
 		if event.pressed:
 			if event.index == 0:
 				touches.clear()
@@ -1313,6 +1545,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_on_tap(event.position)
 			pinch_d0 = 0.0
 	elif event is InputEventScreenDrag:
+		if event.device == -1:
+			return
 		if not touches.has(event.index):
 			return
 		touches[event.index] = event.position
@@ -1324,13 +1558,18 @@ func _unhandled_input(event: InputEvent) -> void:
 				_pan(event.relative)
 		else:
 			_pinch()
-	elif event is InputEventMouseButton and event.pressed:
+	elif event is InputEventMouseButton and event.device != -1 and event.pressed:
+		if _over_ui(event.position):
+			return
+		mouse_seen = true
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_zoom_to(cam.zoom.x * 1.1, event.position)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_zoom_to(cam.zoom.x / 1.1, event.position)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel()
+		elif event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT] and mouse_button == 0:
+			mouse_button = event.button_index
+			mouse_start = event.position
+			mouse_dragged = false
 	elif event is InputEventMagnifyGesture:
 		_zoom_to(cam.zoom.x * event.factor, event.position)
 	elif event is InputEventPanGesture:
@@ -1367,7 +1606,11 @@ func _zoom_to(z: float, screen_pos: Vector2) -> void:
 
 
 func _clamp_cam(p: Vector2) -> Vector2:
-	return Vector2(clampf(p.x, -900.0, 900.0), clampf(p.y, -300.0, 900.0))
+	var bounds := Rect2(view.screen(Vector2i.ZERO, 0), Vector2.ZERO)
+	for corner in [Vector2i(state.map.width - 1, 0), Vector2i(0, state.map.height - 1), Vector2i(state.map.width - 1, state.map.height - 1)]:
+		bounds = bounds.expand(view.screen(corner, 0))
+	bounds = bounds.grow(240.0)
+	return Vector2(clampf(p.x, bounds.position.x, bounds.end.x), clampf(p.y, bounds.position.y - 160.0, bounds.end.y))
 
 
 func _over_ui(pos: Vector2) -> bool:
@@ -1425,6 +1668,13 @@ func _on_tap(pos: Vector2) -> void:
 			if target_set.has(cell):
 				_select_target(cell)
 			else:
+				# Inspecting another cell must not leave an old, confirmable forecast
+				# paired with the newly inspected portrait.
+				sel_target = NONE
+				var skill := SkillDB.get_skill(sel_skill)
+				_skill_heading(skill)
+				preview_text.text = skill["desc"]
+				_set_menu([["确认", _confirm, false], ["取消", _enter_main, true]], skill["name"])
 				_inspect(cell, other)
 		_:
 			_inspect(cell, other)
@@ -1492,7 +1742,13 @@ func _setup_shot() -> void:
 	lord.tp = 3
 	_refresh_all()
 	_set_active(lord)
-	cam.position = _clamp_cam(view.screen(lord.pos, state.map.get_h(lord.pos)) + Vector2(0, -120))
+	# Show the complete diorama between the top chips and bottom HUD in captures.
+	cam.position = view.screen(Vector2i(4, 4), 0) + Vector2(30, 40)
+	cam.zoom = Vector2.ONE * 0.86
+	if Game.shot == "battlemain":
+		state.moved = false
+		_enter_main()
+		return
 	if Game.current_battle == "b1":
 		mode = "main"
 		_enter_target(lord.basic)

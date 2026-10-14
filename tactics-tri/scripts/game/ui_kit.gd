@@ -3,6 +3,55 @@ extends RefCounted
 ## Small helpers for building touch-friendly UI in code.
 
 const MIN_BUTTON_H := 104.0
+const INK := Color(0.11, 0.17, 0.26, 0.98)
+const GOLD := Color(0.84, 0.69, 0.36)
+const IVORY := Color(0.96, 0.92, 0.81)
+const MUTED := Color(0.74, 0.78, 0.76)
+const ALLY := Color(0.48, 0.83, 0.86)
+const FOE := Color(1.0, 0.59, 0.43)
+
+
+## Nine-patch illuminated parchment rim and lapis ink ground.
+static func battle_panel(accent := GOLD, padding := 14.0) -> PanelContainer:
+	var p := panel()
+	var sb := miniature_skin("battle_panel")
+	sb.modulate_color = Color.WHITE.lerp(accent, 0.06)
+	sb.content_margin_left = padding
+	sb.content_margin_right = padding
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	p.add_theme_stylebox_override("panel", sb)
+	return p
+
+
+static func battle_button(text: String, cb: Callable, min_w := 252.0, min_h := MIN_BUTTON_H) -> Button:
+	var b := button(text, cb, min_w, min_h)
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(state, miniature_skin("btn_" + state))
+	b.add_theme_font_size_override("font_size", 30)
+	b.add_theme_color_override("font_color", IVORY)
+	b.add_theme_color_override("font_disabled_color", Color(0.42, 0.48, 0.44))
+	return b
+
+
+static func miniature_skin(asset: String) -> StyleBoxTexture:
+	var sb := StyleBoxTexture.new()
+	sb.texture = load("res://assets/ui/%s.png" % asset)
+	for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+		sb.set_texture_margin(side, 24.0)
+		sb.set_content_margin(side, 14.0)
+	return sb
+
+
+static func meter(width: float, height: float, col: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(width, height)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_theme_stylebox_override("background", color_box(Color(0.04, 0.07, 0.07), 3, Color(0.40, 0.43, 0.33), 1))
+	bar.add_theme_stylebox_override("fill", color_box(col, 2))
+	return bar
 
 
 static func button(text: String, cb: Callable, min_w := 260.0, min_h := MIN_BUTTON_H) -> Button:

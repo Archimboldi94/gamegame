@@ -3,9 +3,10 @@ extends RefCounted
 ## Isometric display mapping with 90° yaw. Logical battle cells never change;
 ## only screen positions / draw order / facing arrows rotate with the camera.
 
-const TW := 128.0
-const TH := 64.0
-const HS := 32.0
+const TW := 160.0
+const TH := 80.0
+const HS := 40.0
+const DIAMOND := [Vector2(0, -TH * 0.5), Vector2(TW * 0.5, 0), Vector2(0, TH * 0.5), Vector2(-TW * 0.5, 0)]
 const ISO_DIR := [
 	Vector2(0.894, -0.447), Vector2(0.894, 0.447),
 	Vector2(-0.894, 0.447), Vector2(-0.894, -0.447),
@@ -84,23 +85,23 @@ func faces_left(facing: int) -> bool:
 
 
 ## Hit-test against one isometric column (top diamond + side faces), local space.
-## Tips (ax == 64) are excluded so neighbouring diamonds do not share an edge pixel.
+## Tips are excluded so neighbouring diamonds do not share an edge pixel.
 func column_contains(local: Vector2, height: int) -> bool:
 	var ax := absf(local.x)
-	if ax >= 64.0:
+	if ax >= TW * 0.5:
 		return false
-	var top_edge := -32.0 + ax * 0.5
-	var bottom_edge := 32.0 - ax * 0.5 + (height + 1) * HS
+	var top_edge := -TH * 0.5 + ax * TH / TW
+	var bottom_edge := TH * 0.5 - ax * TH / TW + (height + 1) * HS
 	return local.y >= top_edge and local.y <= bottom_edge
 
 
 ## Top diamond only (ignores side faces). Preferred for finger picking.
 func top_contains(local: Vector2) -> bool:
 	var ax := absf(local.x)
-	if ax >= 64.0:
+	if ax >= TW * 0.5:
 		return false
-	var top_edge := -32.0 + ax * 0.5
-	var bottom_edge := 32.0 - ax * 0.5
+	var top_edge := -TH * 0.5 + ax * TH / TW
+	var bottom_edge := TH * 0.5 - ax * TH / TW
 	return local.y >= top_edge and local.y <= bottom_edge
 
 

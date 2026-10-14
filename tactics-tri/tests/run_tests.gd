@@ -27,6 +27,7 @@ func _run_all() -> void:
 		"test_every_skill_has_cast_visual", "test_back_button_does_not_quit_battle",
 		"test_iso_rotate_and_pick", "test_pick_ignores_sprite_bounds",
 		"test_water_still_impassable_after_view_rotate", "test_audio_placeholders_and_manager",
+		"test_expanded_tile_edges_and_ground_gaps", "test_battle_hud_and_ground_toggle",
 	]
 	for t in tests:
 		_current = t
@@ -845,6 +846,89 @@ func test_water_still_impassable_after_view_rotate() -> void:
 	var u := mk(0, "swordsman", 0, Vector2i(1, 2))
 	var r := Pathing.search(m, u, [u], 8)
 	check(not r["cost"].has(water), "reachable set never includes deep water")
+
+
+func test_expanded_tile_edges_and_ground_gaps() -> void:
+	var map := BattleMap.flat(5, 5)
+	var view := IsoView.new()
+	view.configure(5, 5)
+	var cell := Vector2i(2, 2)
+	# Real exposed shoulders of the enlarged diamond, well outside a unit's body.
+	for yaw in range(4):
+		view.yaw = yaw
+		var center := view.screen(cell, 0)
+		for offset in [Vector2(-IsoView.TW * 0.38, 0), Vector2(IsoView.TW * 0.38, 0), Vector2(0, IsoView.TH * 0.38)]:
+			eq(view.pick(center + offset, map), cell, "exposed ground at yaw%d / %s" % [yaw, offset])
+	check(not view.top_contains(Vector2(IsoView.TW * 0.5, 0)), "shared tip excluded with enlarged metrics")
+	check(not view.top_contains(Vector2(0, IsoView.TH * 0.5 + 1)), "point below top not a top hit")
+	check(view.column_contains(Vector2(0, IsoView.TH * 0.5 + IsoView.HS), 1), "enlarged column side remains pickable")
+	check(not view.column_contains(Vector2(0, IsoView.TH * 0.5 + IsoView.HS * 2 + 1), 1), "column hit stops at its physical base")
+
+
+func test_battle_hud_and_ground_toggle() -> void:
+	var game = root.get_node("Game")
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	game.shot = "battle"
+	game.current_battle = "b1"
+	var battle = load("res://scripts/game/battle.gd").new()
+	root.add_child(battle)
+	var attacker: BattleUnit = battle.state.current()
+	var defender: BattleUnit = battle.state.unit_at(battle.sel_target)
+	var preview: Dictionary = battle.state.preview(attacker, attacker.basic, defender.pos)[0]
+	eq(battle.selected_panel.unit_name.text, attacker.name, "forecast keeps attacker in left portrait")
+	eq(battle.target_panel.unit_name.text, defender.name, "forecast shows defender in right portrait")
+	eq(battle.damage_label.text, "−%d" % preview["dmg"], "prominent damage comes from rules preview")
+	check(battle.hit_label.text.contains("%d%%" % preview["hit"]), "hit chance comes from rules preview")
+	check(battle.preview_text.text.contains("夹击追击"), "pincer follow-up remains visible")
+	check(battle.skill_chip.visible, "chosen skill chip is visible")
+	eq(battle.timeline_box.get_child_count(), 8, "timeline retains eight turns")
+	check(not battle.unit_nodes[attacker.id].see_through, "attacker stays readable in forecast")
+	check(not battle.unit_nodes[defender.id].see_through, "defender stays readable in forecast")
+	battle._enter_main()
+	for button in battle.menu_box.get_children():
+		check(button.custom_minimum_size.y >= 96, "battle action remains touch-sized")
+	battle._inspect(defender.pos, defender)
+	eq(battle.selected_panel.unit_name.text, defender.name, "inspection selects occupied unit")
+	battle._inspect(defender.pos, defender)
+	check(battle.sel_ground, "same-cell second tap selects ground")
+	eq(battle.selected_panel.unit_name.text, Terrain.info(battle.state.map.get_terrain(defender.pos))["name"], "ground card shows terrain")
+	check(battle.unit_nodes[defender.id].see_through, "ground inspection fades its occupant")
+	battle._inspect(defender.pos, defender)
+	check(not battle.sel_ground, "same-cell third tap returns to unit")
+	check(not battle.unit_nodes[defender.id].see_through, "unit inspection restores its occupant")
+	battle._enter_target("guard")
+	eq(battle.target_panel.unit_name.text, attacker.name, "self skill shows its subject")
+	check(battle.forecast_note.text.contains("自身"), "self skill describes immediate use")
+	var healer: BattleUnit = null
+	for unit in battle.state.units:
+		if unit.cls == "healer" and unit.team == BattleUnit.PLAYER:
+			healer = unit
+	attacker.hp = attacker.max_hp - 7
+	battle.state.current_id = healer.id
+	battle._enter_target("heal")
+	battle._select_target(attacker.pos)
+	eq(battle.selected_panel.unit_name.text, healer.name, "healing keeps caster in left portrait")
+	eq(battle.target_panel.unit_name.text, attacker.name, "healing shows recipient in right portrait")
+	eq(battle.damage_label.text, "+7", "healing preview clamps to missing HP")
+	check(battle.target_panel.hp_text.text.contains("→%d" % attacker.max_hp), "healing predicts capped final HP")
+	var outside := Vector2i(0, 4)
+	battle.cam.force_update_scroll()
+	var finger: Vector2 = battle.get_viewport().get_canvas_transform() * battle.view.screen(outside, battle.state.map.get_h(outside))
+	battle._on_tap(finger)
+	eq(battle.sel_target, Vector2i(-1, -1), "inspecting out-of-range ground clears pending target")
+	check(battle.menu_box.get_child(0).disabled, "old forecast cannot be confirmed after ground inspection")
+	eq(battle.damage_label.text, "", "ground inspection clears old damage forecast")
+	battle._select_target(attacker.pos)
+	# Rotating the actual scene updates geometry, arrows and the selected cursor.
+	for yaw in range(4):
+		battle._rotate_cam(1)
+		var center: Vector2 = battle.view.screen(attacker.pos, battle.state.map.get_h(attacker.pos))
+		eq(battle.view.pick(center, battle.state.map), attacker.pos, "scene picks logical cell after rotation %d" % yaw)
+		eq(battle.tile_cursor.position, center, "cursor follows selected tile after rotation %d" % yaw)
+	battle.free()
+	game.shot = old_shot
+	game.current_battle = old_battle
 
 
 func test_audio_placeholders_and_manager() -> void:

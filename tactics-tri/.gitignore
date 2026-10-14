@@ -3,3 +3,9 @@ build/*.apk
 build/*.idsig
 shots/
 agent*.log
+__pycache__/
+refs/
+codex-*-pass.log
+codex-last-message.txt
+codex-*-last.txt
+codex-prompt-*.txt
