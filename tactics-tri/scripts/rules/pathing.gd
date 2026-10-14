@@ -4,6 +4,7 @@ extends RefCounted
 ## - Climbing up by dh costs ceil(dh / 2) extra movement and is impossible if dh > jump.
 ## - Dropping down is free but impossible if the drop exceeds jump + DROP_EXTRA.
 ## - Units may pass through allies but never through enemies, and cannot end on an occupied tile.
+## - Deep water / river is impassable unless the unit is flying; fords and bridges are walkable.
 
 const DROP_EXTRA := 1
 
@@ -13,15 +14,15 @@ static func climb_extra(dh: int) -> int:
 
 
 ## Movement cost to step from `from` to the adjacent tile `to`, or -1 if blocked by terrain/height.
-static func enter_cost(map: BattleMap, jump: int, from: Vector2i, to: Vector2i) -> int:
-	if not map.is_passable(to):
+static func enter_cost(map: BattleMap, jump: int, from: Vector2i, to: Vector2i, flying := false) -> int:
+	if not map.is_passable(to, flying):
 		return -1
 	var dh := map.get_h(to) - map.get_h(from)
 	if dh > jump:
 		return -1
 	if -dh > jump + DROP_EXTRA:
 		return -1
-	return map.move_cost(to) + climb_extra(dh)
+	return map.move_cost(to, flying) + climb_extra(dh)
 
 
 ## Dijkstra flood fill. Returns {"cost": {pos: int}, "prev": {pos: pos}, "ends": [pos...]}
@@ -47,7 +48,7 @@ static func search(map: BattleMap, unit: BattleUnit, units: Array, max_cost: int
 			var o = occ.get(nx)
 			if o != null and o.team != unit.team:
 				continue
-			var c := enter_cost(map, unit.jump, cur, nx)
+			var c := enter_cost(map, unit.jump, cur, nx, unit.flying)
 			if c < 0:
 				continue
 			var nc: int = int(cost[cur]) + c

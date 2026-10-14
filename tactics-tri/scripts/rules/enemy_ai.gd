@@ -36,7 +36,6 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 		if u.tp >= 1 and u.skills.has("guard") and _nearest_dist(best["move"], foes) <= 2:
 			best["skill"] = "guard"
 			best["target"] = best["move"]
-	best["facing"] = _face_nearest(best["move"], foes, u.facing)
 	return best
 
 
@@ -137,16 +136,3 @@ static func _nearest_dist(p: Vector2i, foes: Array) -> int:
 	for f in foes:
 		best = mini(best, Pathing.manhattan(p, f.pos))
 	return best
-
-
-static func _face_nearest(p: Vector2i, foes: Array, fallback: int) -> int:
-	var best: BattleUnit = null
-	var bd := 1 << 30
-	for f in foes:
-		var d := Pathing.manhattan(p, f.pos)
-		if d < bd:
-			bd = d
-			best = f
-	if best == null:
-		return fallback
-	return Combat.dir_toward(p, best.pos, fallback)

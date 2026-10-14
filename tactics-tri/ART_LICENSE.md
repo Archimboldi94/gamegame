@@ -10,6 +10,9 @@
 python3 tools/gen_art.py
 ```
 
+战斗特效（斩击弧光、投射物、粒子、地格闪光、受击白闪着色器、伤害数字等）全部由
+`scripts/game/battle_fx.gd` 与 `scripts/game/unit_node.gd` 在运行时以补间动画、CPU 粒子和着色器程序化绘制，不使用任何图像素材。
+
 生成的资源与生成脚本一同以与本项目相同的条款发布，可自由使用与修改。
 
 唯一的第三方资源是字体 `fonts/DroidSansFallbackFull.ttf`（Droid Sans Fallback，

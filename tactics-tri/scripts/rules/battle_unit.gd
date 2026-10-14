@@ -33,6 +33,7 @@ var is_leader := false
 var is_lord := false
 var guard := false
 var bonus_move := 0
+var flying := false  # only flying units may cross deep water / rivers
 var ai := "aggressive"
 
 
@@ -57,6 +58,7 @@ static func create(p_id: int, p_name: String, p_cls: String, p_team: int, p_pos:
 	u.eva = int(c["eva"]) + int(bonus.get("eva", 0))
 	u.basic = c["basic"]
 	u.skills = (c["skills"] as Array).duplicate()
+	u.flying = bool(c.get("flying", false))
 	return u
 
 

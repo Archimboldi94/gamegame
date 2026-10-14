@@ -15,6 +15,7 @@ config/description="原创等距视角战术角色扮演游戏"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.png"
+config/quit_on_go_back=false
 
 [autoload]
 

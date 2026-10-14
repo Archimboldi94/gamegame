@@ -1,6 +1,7 @@
 class_name BattleDefs
 extends RefCounted
-## Battle maps (10x10). heights: one digit per tile; terrain codes see Terrain.CODES.
+## Battle maps (10x10). heights: one digit per tile; terrain codes see Terrain.CODES
+## ("w" = deep water / river, impassable on foot; "d" = ford, "b" = bridge).
 ## x grows to the east, y grows to the south.
 
 const DEFS := {
@@ -25,8 +26,8 @@ const DEFS := {
 			"fgggssgggr",
 			"ggggsgggfg",
 			"gggrsrgggg",
-			"wwwwbbwwww",
-			"wwwwbbwwww",
+			"wwwwbbwwdw",
+			"wwwwbbwwdw",
 			"ggrgsggggg",
 			"gfggsgfggg",
 			"ffggsgggfg",
@@ -109,9 +110,9 @@ const DEFS := {
 			"xsxssssxsx",
 			"ggrggggrgg",
 			"gggggsgggg",
-			"gggwwwgfgg",
-			"gfwwwwwggg",
-			"ggggwwgggg",
+			"gggdwdgfgg",
+			"gfdwwwdggg",
+			"ggggddgggg",
 			"gggsssggfg",
 		],
 		"party": [

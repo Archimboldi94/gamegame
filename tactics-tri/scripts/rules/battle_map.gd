@@ -64,15 +64,21 @@ func effect_at(p: Vector2i) -> String:
 	return ""
 
 
-func is_passable(p: Vector2i) -> bool:
-	return in_bounds(p) and bool(Terrain.info(get_terrain(p))["pass"])
+## Walkable for ground units; flying units may additionally cross deep water.
+func is_passable(p: Vector2i, flying := false) -> bool:
+	if not in_bounds(p):
+		return false
+	var info := Terrain.info(get_terrain(p))
+	return bool(info["pass"]) or (flying and bool(info.get("fly", false)))
 
 
-func move_cost(p: Vector2i) -> int:
+func move_cost(p: Vector2i, flying := false) -> int:
 	var t := get_terrain(p)
+	if flying and is_passable(p, true):
+		return 1
 	var c: int = Terrain.info(t)["cost"]
 	if effect_at(p) == "ice":
-		c = 1 if t == "water" else c + 1
+		c = 1 if t == "ford" else c + 1
 	return c
 
 
@@ -83,13 +89,14 @@ func evasion(p: Vector2i) -> int:
 	return e
 
 
-## Returns true if the effect took hold. Fire cannot burn on water (and melts ice); ice freezes water.
+## Returns true if the effect took hold. Fire cannot burn on a ford (and melts ice); ice freezes fords.
+## Deep water and walls take no effects at all.
 func apply_effect(p: Vector2i, type: String) -> bool:
 	if not is_passable(p):
 		return false
 	var t := get_terrain(p)
 	if type == "fire":
-		if t == "water":
+		if t == "ford":
 			return false
 		if effect_at(p) == "ice":
 			effects.erase(p)

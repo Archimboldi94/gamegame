@@ -27,7 +27,7 @@ const SKILLS := {
 	"flame": {"name": "烈焰", "tp": 3, "kind": "mag", "power": 1.1, "rmin": 1, "rmax": 4, "shape": "area1", "effect": "fire",
 		"desc": "十字范围火焰魔法，并使地面燃烧（站在上面的单位回合开始时受伤）。"},
 	"frost": {"name": "寒霜", "tp": 2, "kind": "mag", "power": 0.9, "rmin": 1, "rmax": 4, "shape": "area1", "effect": "ice",
-		"desc": "十字范围冰霜魔法，迟缓敌人行动并冻结地面（浅水结冰可通行）。"},
+		"desc": "十字范围冰霜魔法，迟缓敌人行动并冻结地面（浅滩结冰后更易通行，深水无法冻结）。"},
 	"staff": {"name": "杖击", "power": 0.8, "desc": "以法杖敲击相邻敌人。"},
 	"heal": {"name": "治愈", "tp": 2, "kind": "heal", "power": 1.5, "rmin": 0, "rmax": 3, "desc": "恢复一名同伴的生命。"},
 	"mass_heal": {"name": "圣愈之环", "tp": 3, "kind": "heal", "power": 1.0, "rmin": 0, "rmax": 3, "shape": "area1",

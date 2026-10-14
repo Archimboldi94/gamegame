@@ -51,3 +51,8 @@ func _ready() -> void:
 	foot.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	foot.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	safe.add_child(foot)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		get_tree().quit()

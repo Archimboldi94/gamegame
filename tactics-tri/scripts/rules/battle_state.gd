@@ -9,6 +9,7 @@ const FALL_DMG_PER_LEVEL := 5
 const STEAL_TP := 2
 const DASH_MOVE := 2
 const PINCER_SHAPES := ["single", "line2", "line3"]
+const NO_TARGET := Vector2i(-999, -999)
 
 var map: BattleMap
 var units: Array = []
@@ -20,6 +21,7 @@ var moved := false
 var acted := false
 var move_origin := Vector2i.ZERO
 var origin_facing := 2
+var last_target := NO_TARGET  # tile of the last attack/skill aimed away from the actor this turn
 var turn_count := 0
 var always_hit := false  # tests
 
@@ -97,15 +99,25 @@ func begin_next_turn() -> Dictionary:
 		acted = false
 		move_origin = u.pos
 		origin_facing = u.facing
+		last_target = NO_TARGET
 		return {"unit": u, "events": events}
 	return {"unit": null, "events": events}
 
 
-func end_turn(facing: int) -> void:
+## Facing the unit will keep after its turn: toward the last attack/skill target if there was one,
+## otherwise whatever its last movement step left it with.
+func auto_facing(u: BattleUnit) -> int:
+	if last_target != NO_TARGET and last_target != u.pos:
+		return Combat.dir_toward(u.pos, last_target, u.facing)
+	return u.facing
+
+
+## Ends the current unit's turn. There is no facing choice: the unit auto-faces (see auto_facing).
+func end_turn() -> void:
 	var u := current()
 	if u == null:
 		return
-	u.facing = facing
+	u.facing = auto_facing(u)
 	order.end_turn(u.id, TurnOrder.cost_for(moved, acted))
 	current_id = -1
 
@@ -136,6 +148,7 @@ func move_unit(u: BattleUnit, to: Vector2i) -> Array:
 		u.facing = Combat.dir_toward(path[path.size() - 2], path[path.size() - 1], u.facing)
 	u.pos = to
 	moved = true
+	u.facing = auto_facing(u)
 	return path
 
 
@@ -249,10 +262,12 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 				u.bonus_move += DASH_MOVE
 				moved = false
 				move_origin = u.pos
+				origin_facing = u.facing
 				events.append({"type": "buff", "unit": u, "text": "疾风"})
 		return events
 	var from := u.pos
 	if tile != from:
+		last_target = tile
 		u.facing = Combat.dir_toward(from, tile, u.facing)
 	var entries := preview(u, sid, tile, from)
 	for e in entries:
@@ -309,7 +324,7 @@ func _knockback(t: BattleUnit, from: Vector2i) -> Array:
 		return []
 	dir = Vector2i(signi(dir.x), signi(dir.y))
 	var dest := t.pos + dir
-	var blocked := not map.is_passable(dest) or unit_at(dest) != null or map.get_h(dest) > map.get_h(t.pos)
+	var blocked := not map.is_passable(dest, t.flying) or unit_at(dest) != null or map.get_h(dest) > map.get_h(t.pos)
 	if blocked:
 		var d := t.take_damage(KNOCK_COLLIDE_DMG)
 		if not t.alive():

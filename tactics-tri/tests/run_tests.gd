@@ -16,6 +16,10 @@ func _init() -> void:
 		"test_lance_line_hits_two", "test_fire_and_ice_terrain", "test_steal_and_dash", "test_knockback",
 		"test_vote_initial_and_tally", "test_vote_persuasion", "test_vote_tie_break",
 		"test_ai_prefers_back_attack", "test_battle_defs_valid", "test_ai_full_battles", "test_outcome_rules",
+		"test_deep_water_impassable", "test_ford_and_bridge_passable", "test_flying_crosses_water",
+		"test_water_blocks_ai_and_knockback", "test_maps_river_crossings", "test_auto_facing_after_move",
+		"test_auto_facing_toward_target", "test_auto_facing_consistent_with_back_attack",
+		"test_every_skill_has_cast_visual", "test_back_button_does_not_quit_battle",
 	]
 	for t in tests:
 		_current = t
@@ -78,12 +82,12 @@ func test_drop_limit() -> void:
 
 
 func test_terrain_costs_and_evasion() -> void:
-	var m := BattleMap.from_rows(["000", "000"], ["gfw", "srx"])
+	var m := BattleMap.from_rows(["000", "000"], ["gfd", "srx"])
 	eq(m.move_cost(Vector2i(0, 0)), 1, "grass cost")
 	eq(m.move_cost(Vector2i(1, 0)), 2, "forest cost")
-	eq(m.move_cost(Vector2i(2, 0)), 2, "water slows")
+	eq(m.move_cost(Vector2i(2, 0)), 2, "ford slows")
 	eq(m.evasion(Vector2i(1, 0)), 15, "forest evasion")
-	check(m.evasion(Vector2i(2, 0)) < 0, "water lowers evasion")
+	check(m.evasion(Vector2i(2, 0)) < 0, "ford lowers evasion")
 	check(not m.is_passable(Vector2i(2, 1)), "wall impassable")
 	var a := mk(0, "swordsman", 0, Vector2i(0, 1), 1)
 	var t1 := mk(1, "swordsman", 1, Vector2i(1, 0), 0)
@@ -252,9 +256,9 @@ func test_tp_gain_and_cap() -> void:
 	eq(r["unit"], u, "swordsman first (tie by id)")
 	eq(u.tp, 2, "+1 TP at start of turn")
 	u.tp = 5
-	s.end_turn(2)
+	s.end_turn()
 	s.begin_next_turn()
-	s.end_turn(2)
+	s.end_turn()
 	s.begin_next_turn()
 	eq(u.tp, 5, "TP capped at max 5")
 	eq(u.max_tp, 5, "max TP 5")
@@ -336,17 +340,17 @@ func test_lance_line_hits_two() -> void:
 
 
 func test_fire_and_ice_terrain() -> void:
-	var m := BattleMap.from_rows(["00000", "00000", "00000"], ["ggggg", "ggwgg", "ggggg"])
+	var m := BattleMap.from_rows(["00000", "00000", "00000"], ["ggggg", "ggdgg", "ggggg"])
 	var mage := mk(0, "mage", 0, Vector2i(0, 1), 1)
 	var e := mk(1, "swordsman", 1, Vector2i(3, 1))
 	var s := state_with(m, [mage, e])
 	s.current_id = mage.id
 	mage.tp = 5
 	var water := Vector2i(2, 1)
-	eq(m.move_cost(water), 2, "water cost before freezing")
+	eq(m.move_cost(water), 2, "ford cost before freezing")
 	s.execute(mage, "frost", water)
-	eq(m.effect_at(water), "ice", "frost freezes water")
-	eq(m.move_cost(water), 1, "frozen water walkable at cost 1")
+	eq(m.effect_at(water), "ice", "frost freezes the ford")
+	eq(m.move_cost(water), 1, "frozen ford walkable at cost 1")
 	eq(m.effect_at(Vector2i(2, 0)), "ice", "ice spreads in cross")
 	s.acted = false
 	mage.tp = 5
@@ -354,12 +358,12 @@ func test_fire_and_ice_terrain() -> void:
 	s.execute(mage, "flame", Vector2i(4, 1))
 	eq(m.effect_at(Vector2i(4, 1)), "fire", "flame ignites ground")
 	eq(m.effect_at(Vector2i(3, 1)), "", "fire melts ice instead of burning")
-	check(not m.apply_effect(water, "fire"), "water cannot burn")
-	s.end_turn(1)
+	check(not m.apply_effect(water, "fire"), "ford cannot burn")
+	s.end_turn()
 	e.facing = 2
 	var r := s.begin_next_turn()
 	while r["unit"] != e:
-		s.end_turn(1)
+		s.end_turn()
 		r = s.begin_next_turn()
 	check(str(r["events"]).contains("burn"), "burn event reported")
 	for i in 30:
@@ -511,13 +515,18 @@ func test_ai_full_battles() -> void:
 				if u == null:
 					break
 				var plan := EnemyAI.plan(s, u)
+				check(not plan.has("facing"), "AI plan has no facing choice")
 				if plan["move"] != u.pos:
 					var path := s.move_unit(u, plan["move"])
 					check(not path.is_empty(), "AI move legal")
+					var dry := true
+					for p in path:
+						dry = dry and s.map.is_passable(p, u.flying)
+					check(dry, "%s: AI path never crosses deep water" % id)
 				if plan["skill"] != "":
 					check(s.is_valid_target(u, plan["skill"], plan["target"]) or SkillDB.get_skill(plan["skill"])["kind"] == "self", "AI target valid")
 					s.execute(u, plan["skill"], plan["target"])
-				s.end_turn(plan["facing"])
+				s.end_turn()
 				turns += 1
 			check(s.outcome() != "", "%s seed %d resolves (%s after %d turns)" % [id, seed, s.outcome(), turns])
 
@@ -538,3 +547,225 @@ func test_outcome_rules() -> void:
 	for u in s3.living(1):
 		u.hp = 0
 	eq(s3.outcome(), "win", "all enemies defeated wins b1")
+
+
+# ------------------------------------------------------------ deep water / rivers
+
+func river_map() -> BattleMap:
+	# 5x5, a river runs down column x=2; (2,0) is a ford, (2,4) a bridge.
+	return BattleMap.from_rows(["00000", "00000", "00000", "00000", "00000"],
+		["ggdgg", "ggwgg", "ggwgg", "ggwgg", "ggbgg"])
+
+
+func test_deep_water_impassable() -> void:
+	var m := river_map()
+	check(not m.is_passable(Vector2i(2, 2)), "deep water is not passable on foot")
+	check(m.is_passable(Vector2i(2, 2), true), "deep water passable for fliers")
+	eq(Pathing.enter_cost(m, 9, Vector2i(1, 2), Vector2i(2, 2)), -1, "cannot step into deep water")
+	eq(Terrain.info("water")["name"], "深水", "water is labelled deep water")
+	var u := mk(0, "thief", 0, Vector2i(1, 2))  # mov 5, jump 3: best walker
+	u.mov = 12
+	var r := Pathing.search(m, u, [u], u.mov)
+	for y in range(1, 4):
+		check(not r["cost"].has(Vector2i(2, y)), "river tile (2,%d) never reached" % y)
+		check(not (r["ends"] as Array).has(Vector2i(2, y)), "river tile (2,%d) not highlighted as a move end" % y)
+	check((r["ends"] as Array).has(Vector2i(3, 2)), "far bank reachable via ford/bridge")
+	var path := Pathing.path_to(r, u.pos, Vector2i(3, 2))
+	check(not path.is_empty(), "path to far bank exists")
+	var crosses_dry := path.has(Vector2i(2, 0)) or path.has(Vector2i(2, 4))
+	check(crosses_dry, "path crosses at the ford or bridge")
+	for p in path:
+		check(m.get_terrain(p) != "water", "path step %s is not deep water" % str(p))
+	var s := state_with(m, [u])
+	s.current_id = u.id
+	u.mov = 1
+	eq(s.move_unit(u, Vector2i(2, 2)), [], "move_unit refuses a deep water destination")
+	eq(u.pos, Vector2i(1, 2), "unit stays on the bank")
+	var short := Pathing.search(m, u, [u], 1)
+	check(not short["cost"].has(Vector2i(2, 2)), "short-range search also blocked")
+	check(not m.apply_effect(Vector2i(2, 2), "ice"), "deep water cannot be frozen into a bridge")
+	check(not m.is_passable(Vector2i(2, 2)), "still impassable after frost attempt")
+
+
+func test_ford_and_bridge_passable() -> void:
+	var m := river_map()
+	check(m.is_passable(Vector2i(2, 0)), "ford passable")
+	check(m.is_passable(Vector2i(2, 4)), "bridge passable")
+	eq(m.move_cost(Vector2i(2, 0)), 2, "ford costs 2")
+	eq(m.move_cost(Vector2i(2, 4)), 1, "bridge costs 1")
+	var u := mk(0, "swordsman", 0, Vector2i(1, 0))
+	var r := Pathing.search(m, u, [u], u.mov)
+	check((r["ends"] as Array).has(Vector2i(2, 0)), "can stop on the ford")
+	check((r["ends"] as Array).has(Vector2i(3, 0)), "can wade across the ford")
+	u.pos = Vector2i(1, 4)
+	var r2 := Pathing.search(m, u, [u], u.mov)
+	check((r2["ends"] as Array).has(Vector2i(3, 4)), "can cross the bridge")
+
+
+func test_flying_crosses_water() -> void:
+	var m := river_map()
+	var f := mk(0, "archer", 0, Vector2i(1, 2))
+	f.flying = true
+	var r := Pathing.search(m, f, [f], f.mov)
+	check((r["ends"] as Array).has(Vector2i(2, 2)), "flier may hover over deep water")
+	check((r["ends"] as Array).has(Vector2i(3, 2)), "flier crosses the river directly")
+	eq(int(r["cost"][Vector2i(3, 2)]), 2, "flier pays 1 per water tile")
+	var walls := BattleMap.from_rows(["000"], ["gxg"])
+	f.pos = Vector2i(0, 0)
+	var r2 := Pathing.search(walls, f, [f], 6)
+	check(not r2["cost"].has(Vector2i(1, 0)), "fliers still cannot pass walls")
+	check(not BattleUnit.create(1, "x", "thief", 0, Vector2i.ZERO).flying, "no class flies by default")
+
+
+func test_water_blocks_ai_and_knockback() -> void:
+	var m := BattleMap.from_rows(["0000000", "0000000", "0000000"], ["gggwggg", "gggwggg", "gggwggg"])
+	var foe := mk(10, "swordsman", 1, Vector2i(4, 1))
+	var p := mk(0, "swordsman", 0, Vector2i(2, 1))
+	var s := state_with(m, [p, foe])
+	s.current_id = foe.id
+	var plan := EnemyAI.plan(s, foe)
+	check(plan["skill"] == "" or plan["skill"] == "guard", "AI cannot attack across an uncrossable river (%s)" % plan["skill"])
+	check(m.get_terrain(plan["move"]) != "water", "AI never plans to stand in deep water")
+	foe.mov = 20
+	var full := Pathing.search(m, foe, s.units, 99)
+	for q in full["cost"]:
+		check(m.get_terrain(q) != "water", "AI flood fill never enters water (%s)" % str(q))
+	var l := mk(1, "lancer", 0, Vector2i(1, 1), 1)
+	var e := mk(11, "swordsman", 1, Vector2i(2, 1))
+	e.max_hp = 300
+	e.hp = 300
+	var s2 := state_with(m, [l, e])
+	s2.current_id = l.id
+	l.tp = 5
+	var ev := s2.execute(l, "knockback", e.pos)
+	eq(e.pos, Vector2i(2, 1), "knockback does not push a walker into deep water")
+	check(str(ev).contains("collide"), "river edge counts as an obstacle")
+
+
+func test_maps_river_crossings() -> void:
+	for id in BattleDefs.DEFS:
+		var s := BattleDefs.build_state(id)
+		var lord: BattleUnit = null
+		for u in s.living(0):
+			if u.is_lord:
+				lord = u
+		for u in s.units:
+			var r := s.reachable_for(u)
+			for q in r["cost"]:
+				check(s.map.get_terrain(q) != "water", "%s: %s cannot enter deep water at %s" % [id, u.name, str(q)])
+		# every enemy must still be reachable on foot (via bridge/ford) or the battle could stall
+		var probe := mk(99, "swordsman", 0, lord.pos)
+		probe.jump = 9
+		var full := Pathing.search(s.map, probe, [probe], 999)
+		for foe in s.living(1):
+			var near := false
+			for d in BattleMap.DIRS:
+				near = near or full["cost"].has(foe.pos + d)
+			check(near, "%s: %s reachable on foot" % [id, foe.name])
+	var b1 := BattleDefs.build_map("b1")
+	eq(b1.get_terrain(Vector2i(0, 4)), "water", "b1 river is deep water")
+	eq(b1.get_terrain(Vector2i(4, 4)), "bridge", "b1 bridge")
+	eq(b1.get_terrain(Vector2i(8, 4)), "ford", "b1 ford")
+
+
+# ------------------------------------------------------------ auto facing
+
+func test_auto_facing_after_move() -> void:
+	var m := BattleMap.flat(6, 6)
+	var u := mk(0, "swordsman", 0, Vector2i(1, 1), 0)
+	var e := mk(10, "swordsman", 1, Vector2i(5, 5))
+	var s := state_with(m, [u, e])
+	eq(s.begin_next_turn()["unit"], u, "player first")
+	s.move_unit(u, Vector2i(1, 3))
+	eq(s.auto_facing(u), 2, "after moving south the unit faces south")
+	s.undo_move()
+	eq(u.facing, 0, "undo restores the original facing")
+	s.move_unit(u, Vector2i(3, 1))
+	s.end_turn()
+	eq(u.facing, 1, "end_turn keeps the movement direction (east)")
+	var r := s.begin_next_turn()
+	while r["unit"] != u:
+		s.end_turn()
+		r = s.begin_next_turn()
+	var before := u.facing
+	s.end_turn()
+	eq(u.facing, before, "pure wait keeps facing")
+
+
+func test_auto_facing_toward_target() -> void:
+	var m := BattleMap.flat(6, 6)
+	var a := mk(0, "archer", 0, Vector2i(2, 2), 0)
+	var e := mk(10, "swordsman", 1, Vector2i(5, 2), 0)
+	e.max_hp = 500
+	e.hp = 500
+	var s := state_with(m, [a, e])
+	eq(s.begin_next_turn()["unit"], a, "archer first")
+	s.move_unit(a, Vector2i(2, 4))
+	eq(a.facing, 2, "faces south after moving south")
+	s.execute(a, "shoot", e.pos)
+	eq(a.facing, 1, "faces the target when shooting east")
+	s.end_turn()
+	eq(a.facing, 1, "still faces the last target at turn end")
+	var r := s.begin_next_turn()
+	while r["unit"] != a:
+		s.end_turn()
+		r = s.begin_next_turn()
+	s.execute(a, "shoot", e.pos)
+	s.move_unit(a, Vector2i(5, 5))
+	eq(a.facing, 0, "attack then move: faces back toward the target (north)")
+	s.end_turn()
+	eq(a.facing, 0, "turn ends facing the last target, not the movement direction")
+	var h := mk(1, "healer", 0, Vector2i(0, 0), 3)
+	s.add_unit(h)
+	s.current_id = h.id
+	s.last_target = BattleState.NO_TARGET
+	h.tp = 5
+	s.execute(h, "heal", h.pos)
+	s.end_turn()
+	eq(h.facing, 3, "self-targeted skill does not change facing")
+
+
+func test_auto_facing_consistent_with_back_attack() -> void:
+	var m := BattleMap.flat(7, 7)
+	var p := mk(0, "swordsman", 0, Vector2i(3, 4), 2)
+	var foe := mk(10, "swordsman", 1, Vector2i(3, 2), 2)
+	foe.max_hp = 500
+	foe.hp = 500
+	var s := state_with(m, [p, foe])
+	eq(s.begin_next_turn()["unit"], p, "player first")
+	s.move_unit(p, Vector2i(3, 3))
+	s.execute(p, "slash", foe.pos)
+	s.end_turn()
+	eq(p.facing, 0, "player auto-faces the enemy it struck")
+	eq(Combat.relative_side(p.pos, p.facing, foe.pos), "front", "struck enemy is in front")
+	eq(Combat.relative_side(p.pos, p.facing, Vector2i(3, 4)), "back", "tile behind is the back")
+	var behind := Combat.calc(foe, p, SkillDB.get_skill("slash"), m, Vector2i(3, 4))
+	var front := Combat.calc(foe, p, SkillDB.get_skill("slash"), m, Vector2i(3, 2))
+	eq(behind["side"], "back", "back attack detected against auto-faced unit")
+	check(int(behind["dmg"]) > int(front["dmg"]), "back attack still deals bonus damage")
+	s.current_id = foe.id
+	var plan := EnemyAI.plan(s, foe)
+	eq(Combat.relative_side(p.pos, p.facing, plan["move"]), "back", "AI exploits the predictable auto-facing")
+
+
+# ------------------------------------------------------------ battle presentation
+
+func test_every_skill_has_cast_visual() -> void:
+	var src := FileAccess.get_file_as_string("res://scripts/game/battle.gd")
+	var a := src.find("func _cast(")
+	var b := src.find("\nfunc ", a + 1)
+	check(a >= 0 and b > a, "battle.gd defines _cast")
+	var body := src.substr(a, b - a)
+	for sid in SkillDB.SKILLS:
+		check(src.contains('"%s": Color(' % sid), "skill %s has an effect colour" % sid)
+		var arm := RegEx.create_from_string('\\n\\t\\t("[a-z_]+", )*"%s"(, "[a-z_]+")*:\\n' % sid)
+		check(arm.search(body) != null, "skill %s has its own cast animation arm" % sid)
+	var react := src.substr(src.find("func _react("), 2000)
+	for kind in ["\"damage\":", "\"miss\":", "\"heal\":"]:
+		check(react.contains(kind), "_react handles %s" % kind)
+	check(react.contains("fx.number("), "_react shows floating numbers")
+	check(not src.contains("\"face\""), "battle has no facing-selection mode")
+
+
+func test_back_button_does_not_quit_battle() -> void:
+	eq(ProjectSettings.get_setting("application/config/quit_on_go_back", true), false, "Android back cancels instead of quitting")

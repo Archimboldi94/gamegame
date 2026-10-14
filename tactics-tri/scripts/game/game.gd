@@ -29,6 +29,7 @@ var theme: Theme
 var shot := ""
 var shot_out := ""
 var shot_frames := 45
+var autoplay := ""  # --autoplay=<battle id>: AI plays both sides through the real battle scene, then quits
 
 
 func _ready() -> void:
@@ -37,6 +38,9 @@ func _ready() -> void:
 	_parse_args()
 	if shot != "":
 		_do_shot.call_deferred()
+	elif autoplay != "":
+		current_battle = autoplay
+		_change.call_deferred("battle")
 
 
 # ------------------------------------------------------------------ flow
@@ -198,6 +202,8 @@ func _parse_args() -> void:
 			shot_out = a.substr(6)
 		elif a.begins_with("--frames="):
 			shot_frames = maxi(5, a.substr(9).to_int())
+		elif a.begins_with("--autoplay="):
+			autoplay = a.substr(11)
 
 
 func _do_shot() -> void:
@@ -210,9 +216,9 @@ func _do_shot() -> void:
 		"vote":
 			step = 4
 			_change("vote")
-		"battle", "battle2a", "battle2b":
-			step = 2 if shot == "battle" else 6
-			current_battle = {"battle": "b1", "battle2a": "b2A", "battle2b": "b2B"}[shot]
+		"battle", "battle2a", "battle2b", "battlefx":
+			step = 6 if shot.begins_with("battle2") else 2
+			current_battle = {"battle": "b1", "battlefx": "b1", "battle2a": "b2A", "battle2b": "b2B"}[shot]
 			_change("battle")
 		"ending":
 			vote_result = "B"
