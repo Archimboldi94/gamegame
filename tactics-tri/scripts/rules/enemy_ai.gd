@@ -27,7 +27,7 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 		if state.map.effect_at(tile) == "fire":
 			tile_bonus -= 8.0
 		for sid in u.all_actions():
-			var sk := SkillDB.get_skill(sid)
+			var sk: Dictionary = u.skill(sid)
 			if sk["kind"] == "self" or sk["kind"] == "move" or not state.skill_usable(u, sid):
 				continue
 			if u.use_gdd_rules and int(reach["cost"][tile]) + int(sk.get("ap", 0)) > u.ap:
@@ -63,7 +63,7 @@ static func _gdd_support(state: BattleState, u: BattleUnit, reach: Dictionary, b
 	# 燕行步 is ZoC-immune; 踏雪步 pays normal opportunity risk but lands with 护势.
 	if (best["skill"] == "" or score < 6.0) and not holding and not foes.is_empty():
 		for sid in u.all_actions():
-			var sk := SkillDB.get_skill(sid)
+			var sk: Dictionary = u.skill(sid)
 			if sk["shape"] != "leap":
 				continue
 			if not state.skill_usable(u, sid):
@@ -93,7 +93,7 @@ static func _gdd_support(state: BattleState, u: BattleUnit, reach: Dictionary, b
 					score = leap_score
 	# Rest / guard from the current tile so approach does not spend the AP first.
 	# Do not turtle forever when we already outnumber a wounded last foe.
-	var finish := foes.size() <= 1 and (foes.is_empty() or float(foes[0].hp) <= float(foes[0].max_hp) * 0.55)
+	var finish := foes.size() == 1 and float(foes[0].hp) <= float(foes[0].max_hp) * 0.55
 	if score < 12.0 and not finish:
 		var threatened := threat_count(state, u, u.pos) > 0 or current_dist <= 2
 		var low_hp := float(u.hp) <= float(u.max_hp) * 0.45
@@ -101,7 +101,7 @@ static func _gdd_support(state: BattleState, u: BattleUnit, reach: Dictionary, b
 		for sid in ["守关式", "防御", "调息"]:
 			if not u.all_actions().has(sid) or not state.skill_usable(u, sid):
 				continue
-			var sk := SkillDB.get_skill(sid)
+			var sk: Dictionary = u.skill(sid)
 			if int(sk.get("ap", 0)) > u.ap or u.qi < int(sk.get("qi", 0)):
 				continue
 			var support := 0.0
@@ -244,7 +244,7 @@ static func threat_count(state: BattleState, u: BattleUnit, tile: Vector2i) -> i
 			continue
 		var r := 0
 		for sid in f.all_actions():
-			var sk := SkillDB.get_skill(sid)
+			var sk: Dictionary = f.skill(sid)
 			if sk["kind"] == "phys" or sk["kind"] == "mag":
 				r = maxi(r, int(sk["rmax"]))
 		var dist := Pathing.chebyshev(f.pos, tile) if u.use_gdd_rules else Pathing.manhattan(f.pos, tile)

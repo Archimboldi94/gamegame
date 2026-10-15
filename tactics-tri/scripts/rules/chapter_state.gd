@@ -153,8 +153,6 @@ static func from_dict(data: Dictionary) -> ChapterState:
 		return null
 	if (s.lesson_received or s.stance != "" or s.b2_clear or s.b3_clear) and not s.b1_clear:
 		return null
-	if s.lesson_received and s.insights < 1:
-		return null
 	if s.complete and not (s.b3_clear and s.ledger_received):
 		return null
 	if data["version"] == 2:

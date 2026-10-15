@@ -315,9 +315,14 @@ func _do_shot() -> void:
 			if shot in ["library", "party"]:
 				chapter.apply_event("quest_start")
 				chapter.apply_event("b1_clear", {"result": "win"})
+				chapter.apply_event("reversal_lesson")
+				chapter.party.learn("sword", "回锋剑")
+				if shot == "library":
+					chapter.party.refine("sword", "破风剑", "延锋")
 				if shot == "party":
-					chapter.party.gain_exp("sword", 370)
+					chapter.party.gain_exp("sword", 420)
 					chapter.party.train("sword", "凝神")
+					chapter.party.set_mastery("sword", "回旋")
 			_change("explore")
 		"title":
 			_change("title")

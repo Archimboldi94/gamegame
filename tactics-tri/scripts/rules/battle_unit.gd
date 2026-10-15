@@ -27,11 +27,20 @@ var max_tp := 5
 var use_gdd_rules := false
 var level := 1
 var innate_trait := ""
+var mastery := ""
+var skill_branches: Dictionary = {}
 var moved_tiles := 0
 var youfeng_used := false
 var shouxian_used := false
 var tongmai_pending := false
 var tongmai_triggered := false
+var ningfeng_used := false # mastery 凝锋: first single pierce+1 this action
+var huixuan_used := false # mastery 回旋: first retreat leave this action
+var jieliu_used := false # mastery 截流 once per round
+var chenwen_armor := false # mastery 沉稳 pending armor
+var huoluo_pending := false # mastery 活络 next-turn qi
+var cangfeng_hits := 0 # 藏锋: next incoming active hit -5%
+var move_tax := 0 # 拒敌: extra AP on first move tile
 var ap := 6
 var max_ap := 6
 var qi := 12
@@ -109,6 +118,11 @@ func class_label() -> String:
 
 func all_actions() -> Array:
 	return [basic] + skills
+
+
+func skill(sid: String) -> Dictionary:
+	return SkillDB.resolve(sid, String(skill_branches.get(sid, "")))
+
 
 
 func gain_guard() -> void:

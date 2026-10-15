@@ -104,3 +104,48 @@ static func has_skill(id: String) -> bool:
 static func get_inner(id: String) -> Dictionary:
 	_load_wuxia()
 	return wuxia_inners.get(id, {}).duplicate(true)
+
+
+## Apply a GDD refinement branch onto a skill dict copy.
+static func resolve(sid: String, branch := "") -> Dictionary:
+	var sk := get_skill(sid)
+	if branch == "" or not PartyState.BRANCHES.has(sid) or not PartyState.BRANCHES[sid].has(branch):
+		return sk
+	sk["branch"] = branch
+	match sid:
+		"破风剑":
+			if branch == "延锋":
+				sk["rmax"] = 4
+				sk["range"] = 4
+				sk["qi"] = int(sk.get("qi", 0)) + 1
+			elif branch == "凝锋":
+				sk["shape"] = "single"
+				sk["pierce"] = 2
+		"回锋剑":
+			if branch == "游身":
+				sk["retreat_safe"] = true
+			elif branch == "回刺":
+				sk["effect"] = ""
+				sk["pierce"] = int(sk.get("pierce", 0)) + 2
+		"震山掌":
+			if branch == "摧阵":
+				sk["push_distance"] = 2
+			elif branch == "裂势":
+				sk["break_guard"] = true
+		"截脉指":
+			if branch == "探穴":
+				sk["rmax"] = 2
+				sk["range"] = 2
+				sk["qi"] = int(sk.get("qi", 0)) + 1
+			elif branch == "封脉":
+				sk["seal_ap"] = 3
+		"燕行步":
+			if branch == "长跃":
+				sk["rmax"] = 4
+				sk["range"] = 4
+				sk["qi"] = int(sk.get("qi", 0)) + 1
+			elif branch == "藏锋":
+				sk["landing_evasion"] = 5
+	var tip: String = PartyState.BRANCHES[sid][branch]
+	sk["desc"] = String(sk.get("desc", "")) + "　【精进·%s】%s" % [branch, tip]
+	return sk

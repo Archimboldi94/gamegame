@@ -102,14 +102,23 @@ func begin_next_turn() -> Dictionary:
 					if other.alive():
 						other.rp = 1
 						other.shouxian_used = false
+						other.jieliu_used = false
 			u.qi_blocked = u.ap_penalty > 0
-			u.ap = maxi(0, u.max_ap - mini(2, u.ap_penalty))
+			u.ap = maxi(0, u.max_ap - clampi(u.ap_penalty, 0, 3))
 			u.ap_penalty = 0
-			u.qi = mini(u.max_qi, u.qi + 1 + int(SkillDB.get_inner(u.inner).get("start_qi", 0)) + (1 if u.tongmai_pending else 0))
+			var start_qi := 1 + int(SkillDB.get_inner(u.inner).get("start_qi", 0)) + (1 if u.tongmai_pending else 0)
+			if u.huoluo_pending:
+				start_qi += 1
+				u.huoluo_pending = false
+			if String(u.skill_branches.get(u.inner, "")) == "逆息" and u.qi * 2 < u.max_qi:
+				start_qi += 1
+			u.qi = mini(u.max_qi, u.qi + start_qi)
 			u.tongmai_pending = false
 			u.tongmai_triggered = false
 			u.moved_tiles = 0
 			u.youfeng_used = false
+			u.ningfeng_used = false
+			u.huixuan_used = false
 			u.used_skills.clear()
 		if map.effect_at(u.pos) == "fire":
 			var burn := u.take_damage(maxi(3, u.max_hp / 10))
@@ -147,6 +156,8 @@ func end_turn() -> void:
 		if u.alive() and inner.has("end_guard_ap") and u.ap >= int(inner["end_guard_ap"]) and not u.used_skills.get("inner_end", false):
 			u.gain_guard()
 			u.used_skills["inner_end"] = true
+		if u.alive() and u.mastery == "沉稳" and u.ap >= 2:
+			u.chenwen_armor = true
 		u.qi_blocked = false
 	u.facing = auto_facing(u)
 	order.end_turn(u.id, TurnOrder.cost_for(moved, acted))
@@ -161,6 +172,9 @@ func turn_preview(n := 8) -> Array:
 
 func reachable_for(u: BattleUnit) -> Dictionary:
 	var budget := u.ap if u.use_gdd_rules else (u.mov + u.bonus_move)
+	# 拒敌: tax is paid on the first leave-step; shrink the search budget accordingly.
+	if u.use_gdd_rules and u.move_tax > 0:
+		budget = maxi(0, budget - u.move_tax)
 	return Pathing.search(map, u, units, budget)
 
 
@@ -187,10 +201,14 @@ func move_unit(u: BattleUnit, to: Vector2i) -> Array:
 			var from: Vector2i = path[i - 1]
 			var step_to: Vector2i = path[i]
 			var step_cost := Pathing.enter_cost(map, u.jump, from, step_to, u.flying)
+			if i == 1 and u.move_tax > 0:
+				step_cost += u.move_tax
 			if step_cost < 0 or u.ap < step_cost:
 				path = path.slice(0, i)
 				break
 			u.ap -= step_cost
+			if i == 1 and u.move_tax > 0:
+				u.move_tax = 0
 			var reactors := ControlZone.leaving_sources(u, from, step_to, units, map)
 			if not reactors.is_empty():
 				events.append_array(_resolve_reaction(reactors[0], u, true))
@@ -248,7 +266,7 @@ func path_reactions(u: BattleUnit, path: Array, immune := false, initial_facing 
 ## Auto-counter eligibility on hit/miss, including knockback and free retreat.
 ## All values are conditional on surviving any preceding reactions.
 func counter_preview(u: BattleUnit, sid: String, target: BattleUnit) -> Dictionary:
-	var sk := SkillDB.get_skill(sid)
+	var sk: Dictionary = u.skill(sid)
 	if not u.use_gdd_rules or sk["shape"] != "single" or not ControlZone.can_react(target, u, map, u.pos):
 		return {}
 	var attack := Combat.calc(u, target, sk, map, u.pos)
@@ -307,7 +325,7 @@ func undo_move() -> void:
 func skill_usable(u: BattleUnit, sid: String) -> bool:
 	if not SkillDB.has_skill(sid):
 		return false
-	var sk := SkillDB.get_skill(sid)
+	var sk: Dictionary = u.skill(sid)
 	if u.use_gdd_rules:
 		if not u.alive() or not u.all_actions().has(sid):
 			return false
@@ -318,7 +336,7 @@ func skill_usable(u: BattleUnit, sid: String) -> bool:
 
 
 func target_tiles(u: BattleUnit, sid: String, from: Vector2i) -> Array:
-	var sk := SkillDB.get_skill(sid)
+	var sk: Dictionary = u.skill(sid)
 	if sk["shape"] == "leap":
 		return lightfoot_reach(u, sk, from)["ends"]
 	if sk["shape"] == "self":
@@ -352,7 +370,7 @@ func pincer_partner(att: BattleUnit, tgt: BattleUnit, from: Vector2i) -> BattleU
 func preview(u: BattleUnit, sid: String, tile: Vector2i, from := Vector2i(-999, -999)) -> Array:
 	if from == Vector2i(-999, -999):
 		from = u.pos
-	var sk := SkillDB.get_skill(sid)
+	var sk: Dictionary = u.skill(sid)
 	if sk["kind"] == "self" or sk["shape"] == "leap":
 		return []
 	var out := []
@@ -387,7 +405,7 @@ func preview(u: BattleUnit, sid: String, tile: Vector2i, from := Vector2i(-999, 
 func is_valid_target(u: BattleUnit, sid: String, tile: Vector2i) -> bool:
 	if u.use_gdd_rules and not skill_usable(u, sid):
 		return false
-	var sk := SkillDB.get_skill(sid)
+	var sk: Dictionary = u.skill(sid)
 	if sk["shape"] == "leap":
 		return (lightfoot_reach(u, sk, u.pos)["ends"] as Array).has(tile)
 	if sk["kind"] == "self":
@@ -407,7 +425,7 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 	# Validate everything before mutating resources, usage limits, facing or turn flags.
 	if u.use_gdd_rules and (not skill_usable(u, sid) or not is_valid_target(u, sid, tile)):
 		return []
-	var sk := SkillDB.get_skill(sid)
+	var sk: Dictionary = u.skill(sid)
 	var events := []
 	if u.use_gdd_rules:
 		u.ap -= int(sk.get("ap", 0))
@@ -430,6 +448,8 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 				events.append({"type": "buff", "unit": u, "text": "护势"})
 			"rest":
 				u.qi = mini(u.max_qi, u.qi + 4)
+				if u.mastery == "活络":
+					u.huoluo_pending = true
 				events.append({"type": "buff", "unit": u, "text": "调息 +4内力"})
 			"dash":
 				u.bonus_move += DASH_MOVE
@@ -455,6 +475,9 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 				if u.alive() and u.pos == tile and bool(sk.get("landing_guard", false)):
 					u.gain_guard()
 					events.append({"type": "buff", "unit": u, "text": "护势"})
+				if u.alive() and u.pos == tile and int(sk.get("landing_evasion", 0)) > 0:
+					u.cangfeng_hits = 1
+					events.append({"type": "buff", "unit": u, "text": "藏锋"})
 		return events
 	var from := u.pos
 	if tile != from:
@@ -463,6 +486,11 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 	var entries := preview(u, sid, tile, from)
 	if u.use_gdd_rules and u.innate_trait == "游锋" and u.moved_tiles >= 2 and not u.youfeng_used and sk["shape"] == "single" and sk["kind"] == "phys":
 		u.youfeng_used = true # the next attack consumes the bonus even if it misses
+	if u.use_gdd_rules and u.mastery == "凝锋" and not u.ningfeng_used and sk["shape"] == "single" and sk["kind"] == "phys":
+		u.ningfeng_used = true
+	if u.use_gdd_rules and bool(sk.get("break_guard", false)):
+		for e0 in entries:
+			e0["unit"].guard = false
 	for e in entries:
 		var t: BattleUnit = e["unit"]
 		if e["heal"]:
@@ -482,6 +510,10 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 				u.tongmai_triggered = true
 			t.guard = false
 			t.block = false
+			if t.cangfeng_hits > 0:
+				t.cangfeng_hits = 0
+			if t.chenwen_armor:
+				t.chenwen_armor = false
 		events.append({"type": "damage", "unit": t, "by": u, "amount": dealt, "side": e["side"], "killed": not t.alive()})
 		if not t.alive():
 			order.remove(t.id)
@@ -500,10 +532,14 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 			"knockback":
 				events.append_array(_knockback(t, from))
 			"wuxia_push":
-				events.append_array(_wuxia_push(t, from))
+				events.append_array(_wuxia_push(t, from, int(sk.get("push_distance", 1))))
 			"seal":
-				t.ap_penalty = 2
-				events.append({"type": "buff", "unit": t, "text": "气脉受阻：下次行动 -2AP"})
+				var seal_ap := int(sk.get("seal_ap", 2))
+				if u.mastery == "截流" and not u.jieliu_used:
+					seal_ap += 1
+					u.jieliu_used = true
+				t.ap_penalty = maxi(t.ap_penalty, seal_ap)
+				events.append({"type": "buff", "unit": t, "text": "气脉受阻：下次行动 -%dAP" % seal_ap})
 			"retreat":
 				events.append_array(_retreat(u, sk, tile))
 		if t.alive() and e.has("pincer"):
@@ -550,14 +586,17 @@ func retreat_path(u: BattleUnit, target: Vector2i) -> Array:
 
 
 ## GDD forced movement: eight directions, no collision or falling bonus damage, no ZoC.
-func _wuxia_push(t: BattleUnit, from: Vector2i) -> Array:
+func _wuxia_push(t: BattleUnit, from: Vector2i, distance := 1) -> Array:
 	var step := Vector2i(signi(t.pos.x - from.x), signi(t.pos.y - from.y))
-	var dest := t.pos + step
-	if Pathing.enter_cost(map, t.jump, t.pos, dest, t.flying) < 0 or unit_at(dest) != null:
-		return []
-	var old := t.pos
-	t.pos = dest
-	return [{"type": "knockback", "unit": t, "from": old, "to": dest, "amount": 0, "killed": false}]
+	var events := []
+	for _i in maxi(1, distance):
+		var dest := t.pos + step
+		if Pathing.enter_cost(map, t.jump, t.pos, dest, t.flying) < 0 or unit_at(dest) != null:
+			break
+		var old_pos := t.pos
+		t.pos = dest
+		events.append({"type": "knockback", "unit": t, "from": old_pos, "to": dest, "amount": 0, "killed": false})
+	return events
 
 
 func _pincer(partner: BattleUnit, t: BattleUnit) -> Array:
@@ -608,6 +647,8 @@ func _resolve_reaction(reactor: BattleUnit, target: BattleUnit, opportunity: boo
 		e = Combat.gdd_calc(reactor, target, sk, map, reactor.pos, true, opportunity)
 		if opportunity and reactor.innate_trait == "守线":
 			reactor.shouxian_used = true
+		if opportunity and target.mastery == "回旋" and not target.huixuan_used:
+			target.huixuan_used = true
 	else:
 		e = Combat.calc(reactor, target, sk, map, reactor.pos)
 	var tag := "opportunity" if opportunity else "counter"
@@ -617,6 +658,8 @@ func _resolve_reaction(reactor: BattleUnit, target: BattleUnit, opportunity: boo
 	if reactor.use_gdd_rules:
 		target.guard = false
 		target.block = false
+		if not opportunity and reactor.mastery == "拒敌" and dealt > 0:
+			target.move_tax = maxi(target.move_tax, 1)
 	if not target.alive():
 		order.remove(target.id)
 	return [{"type": tag, "unit": target, "by": reactor, "amount": dealt, "hit": true, "killed": not target.alive(), "side": e["side"]}]

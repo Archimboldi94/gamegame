@@ -839,7 +839,7 @@ func _enter_main() -> void:
 		_hint("选择行动；「撤销移动」可回到原位")
 	else:
 		_hint("可以继续移动，或「待机」结束回合")
-	var basic := SkillDB.get_skill(u.basic)
+	var basic := u.skill(u.basic) if u.use_gdd_rules else SkillDB.get_skill(u.basic)
 	var can_attack := state.skill_usable(u, u.basic) if u.use_gdd_rules else not state.acted
 	var can_skill := false
 	for sid in u.skills:
@@ -903,7 +903,7 @@ func _show_reach(u: BattleUnit, stand: Array) -> void:
 	for s in stand:
 		if u.use_gdd_rules:
 			var step_cost: int = move_info.get("cost", {}).get(s, 0)
-			if not state.skill_usable(u, u.basic) or step_cost + int(SkillDB.get_skill(u.basic).get("ap", 0)) > u.ap:
+			if not state.skill_usable(u, u.basic) or step_cost + int(u.skill(u.basic) if u.use_gdd_rules else SkillDB.get_skill(u.basic).get("ap", 0)) > u.ap:
 				continue
 		for p in state.target_tiles(u, u.basic, s):
 			reach[p] = true
@@ -970,7 +970,7 @@ func _on_skills() -> void:
 	_set_menu(items, _menu_title(u))
 	if u.use_gdd_rules:
 		for i in u.skills.size():
-			var sk := SkillDB.get_skill(u.skills[i])
+			var sk: Dictionary = u.skill(u.skills[i])
 			menu_box.get_child(i).tooltip_text = sk["desc"] + ("\n本行动已使用" if bool(sk.get("once", false)) and u.used_skills.get(u.skills[i], false) else ("\nAP或内力不足" if not state.skill_usable(u, u.skills[i]) else ""))
 	preview_text.text = desc.strip_edges()
 	preview_panel.visible = true
@@ -1020,7 +1020,7 @@ func _select_target(cell: Vector2i) -> void:
 		return
 	sel_target = cell
 	sel_ground = false
-	var sk := SkillDB.get_skill(sel_skill)
+	var sk := (state.current().skill(sel_skill) if state.current() != null and state.current().use_gdd_rules else SkillDB.get_skill(sel_skill))
 	_clear_hl2()
 	for p in Combat.affected_tiles(sk, u.pos, cell, state.map):
 		_set_hl(p, COL_AREA, true)
@@ -1110,7 +1110,7 @@ func _confirm() -> void:
 	_clear_preview()
 	_hint("")
 	_clear_hl()
-	var sk := SkillDB.get_skill(sel_skill)
+	var sk := (state.current().skill(sel_skill) if state.current() != null and state.current().use_gdd_rules else SkillDB.get_skill(sel_skill))
 	if int(sk["tp"]) > 0:
 		_banner(sk["name"], COL_PLAYER, 0.4)
 	await _perform(u, sel_skill, sel_target)
@@ -1869,7 +1869,7 @@ func _on_tap(pos: Vector2) -> void:
 				# Inspecting another cell must not leave an old, confirmable forecast
 				# paired with the newly inspected unit or tile.
 				sel_target = NONE
-				var skill := SkillDB.get_skill(sel_skill)
+				var skill := (state.current().skill(sel_skill) if state.current() != null and state.current().use_gdd_rules else SkillDB.get_skill(sel_skill))
 				_skill_heading(skill)
 				_set_menu([["确认", _confirm, false], ["取消", _enter_main, true]], skill["name"])
 				_inspect(cell, other)

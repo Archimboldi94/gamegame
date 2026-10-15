@@ -19,10 +19,32 @@ const TRAIT_TEXT := {
 	"守线": "每轮第一次合法离区借机攻击命中+5%。",
 	"通脉": "点穴／控制招式命中后，下次自身行动额外恢复1内力；每行动一次。",
 }
+## GDD 5.8 suggested branches: skill_id -> {branch_id: short desc}
+const BRANCHES := {
+	"破风剑": {"延锋": "直线射程3→4，内力+1", "凝锋": "改为单体攻击，破甲+2"},
+	"回锋剑": {"游身": "本招后撤可安全脱离控制区", "回刺": "舍弃后撤，本次破甲+2"},
+	"震山掌": {"摧阵": "合法击退距离1→2", "裂势": "命中前先破势再结算伤害"},
+	"截脉指": {"探穴": "攻击距离1→2，内力+1", "封脉": "气脉受阻削减AP 2→3"},
+	"归元诀": {"绵长": "内力上限+3", "逆息": "内力不足一半时，行动额外恢复1内力"},
+	"燕行步": {"长跃": "轻功距离3→4，内力+1", "藏锋": "落地后下次受主动攻击命中-5%"},
+}
+const MASTERIES := {
+	"sword": ["回旋", "凝锋"],
+	"spear": ["拒敌", "沉稳"],
+	"fist": ["截流", "活络"],
+}
+const MASTERY_TEXT := {
+	"回旋": "自主后撤首次离开控制区时，借机命中-10%。",
+	"凝锋": "本次行动第一次单体攻击固定破甲+1。",
+	"拒敌": "反击命中后，目标下次移动首格额外耗1AP。",
+	"沉稳": "行动结束剩余AP≥2时，下次受击临时护甲+1。",
+	"截流": "气脉受阻对同一敌人首次生效时额外-1AP，每轮一次。",
+	"活络": "若本行动调息成功，下次行动开始额外恢复1内力。",
+}
 
 var characters: Dictionary = {}
 var library: Array[String] = []
-var lesson := 0 # reserved shared insight currency; no refinement spending in this slice
+var lesson := 0 # shared 武学心得; spent to unlock one refinement per art
 
 
 func _init() -> void:
@@ -41,7 +63,8 @@ func _init() -> void:
 		learned.append(base["inner"])
 		learned.append(base["lightfoot"])
 		characters[IDS[i]] = {"level": 1, "exp": 0, "training": {}, "learned": learned,
-			"active": active, "inner": base["inner"], "lightfoot": base["lightfoot"], "weapon": base["weapon"]}
+			"active": active, "inner": base["inner"], "lightfoot": base["lightfoot"], "weapon": base["weapon"],
+			"branches": {}, "mastery": ""}
 		for sid in learned:
 			collect(sid)
 
@@ -127,6 +150,8 @@ func stats(id: String) -> Dictionary:
 		var bonus: Array = TRAINING[direction]
 		result[bonus[0]] += int(c["training"][direction]) * int(bonus[1])
 	result["hp"] = result["max_hp"]
+	if String(c.get("branches", {}).get(c.get("inner", ""), "")) == "绵长":
+		result["qi"] = int(result["qi"]) + 3
 	return result
 
 
@@ -190,6 +215,59 @@ func set_weapon(id: String, weapon: String) -> bool:
 	return true
 
 
+func branch_options(sid: String) -> Array:
+	if not BRANCHES.has(sid):
+		return []
+	return BRANCHES[sid].keys()
+
+
+func can_refine(id: String, sid: String) -> bool:
+	if not characters.has(id) or not BRANCHES.has(sid) or lesson < 1:
+		return false
+	var c: Dictionary = characters[id]
+	return c["learned"].has(sid) and not c.get("branches", {}).has(sid)
+
+
+## Spend 1 insight to unlock both branches; `branch` becomes the active one.
+func refine(id: String, sid: String, branch: String) -> bool:
+	if not can_refine(id, sid) or not BRANCHES[sid].has(branch):
+		return false
+	lesson -= 1
+	characters[id]["branches"][sid] = branch
+	return true
+
+
+func set_branch(id: String, sid: String, branch: String) -> bool:
+	if not characters.has(id) or not BRANCHES.has(sid) or not BRANCHES[sid].has(branch):
+		return false
+	var c: Dictionary = characters[id]
+	if not c.get("branches", {}).has(sid):
+		return false
+	c["branches"][sid] = branch
+	return true
+
+
+func active_branch(id: String, sid: String) -> String:
+	return String(characters.get(id, {}).get("branches", {}).get(sid, ""))
+
+
+func mastery_options(id: String) -> Array:
+	return MASTERIES.get(id, []).duplicate()
+
+
+func can_choose_mastery(id: String) -> bool:
+	return characters.has(id) and int(characters[id]["level"]) >= 4
+
+
+func set_mastery(id: String, mastery: String) -> bool:
+	if not can_choose_mastery(id):
+		return false
+	if mastery != "" and not MASTERIES.get(id, []).has(mastery):
+		return false
+	characters[id]["mastery"] = mastery
+	return true
+
+
 func apply_to_unit(u: BattleUnit) -> void:
 	if not u.use_gdd_rules or u.team != BattleUnit.PLAYER or u.id < 0 or u.id >= IDS.size():
 		return
@@ -217,6 +295,8 @@ func apply_to_unit(u: BattleUnit) -> void:
 	if u.lightfoot != "":
 		u.skills.append(u.lightfoot)
 	u.skills.append_array(["防御", "调息"])
+	u.skill_branches = c.get("branches", {}).duplicate(true)
+	u.mastery = String(c.get("mastery", ""))
 
 
 func to_dict() -> Dictionary:
@@ -247,6 +327,12 @@ static func from_dict(data: Dictionary) -> PartyState:
 			return null
 		if not c.get("training") is Dictionary or not c.get("learned") is Array or not c.get("active") is Array or c["active"].size() != 3 or not WEAPONS.has(c.get("weapon")):
 			return null
+		if not c.has("branches"):
+			c["branches"] = {}
+		if not c.has("mastery"):
+			c["mastery"] = ""
+		if not c.get("branches") is Dictionary or not c.get("mastery") is String:
+			return null
 		for direction in c["training"]:
 			if not TRAINING.has(direction) or not _integer(c["training"][direction], 0, 4):
 				return null
@@ -256,6 +342,14 @@ static func from_dict(data: Dictionary) -> PartyState:
 		c["exp"] = int(c["exp"])
 		for direction in c["training"]:
 			c["training"][direction] = int(c["training"][direction])
+		for sid in c["branches"]:
+			if not sid is String or not c["learned"].has(sid) or not BRANCHES.has(sid):
+				return null
+			if not c["branches"][sid] is String or not BRANCHES[sid].has(c["branches"][sid]):
+				return null
+		if c["mastery"] != "":
+			if int(c["level"]) < 4 or not MASTERIES.get(id, []).has(c["mastery"]):
+				return null
 		var seen := []
 		for sid in c["learned"]:
 			if not sid is String or not p.library.has(sid) or seen.has(sid):

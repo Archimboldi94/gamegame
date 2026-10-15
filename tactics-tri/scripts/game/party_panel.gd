@@ -106,7 +106,7 @@ func _render() -> void:
 		_party(left, right)
 	var foot := UIKit.hbox(16)
 	content.add_child(foot)
-	var footer := _text(foot, notice if notice != "" else "武学心得 %d · 精进暂未开放    /    行路与整备自动保存" % Game.chapter.party.lesson, 22, UIKit.MUTED)
+	var footer := _text(foot, notice if notice != "" else "武学心得 %d · 可对已学武学精进一次（二选一）· 4级开放专精槽    /    行路与整备自动保存" % Game.chapter.party.lesson, 22, UIKit.MUTED)
 	footer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(_button("保存并返回标题", func(): return_to_title.emit(), 240))
 
@@ -144,7 +144,8 @@ func _mutate(action: Callable, message: String) -> void:
 func _preview(sid: String) -> String:
 	if PartyState.category(sid) == "内功":
 		return "AP 0 / 内力 0 · 范围：自身（被动）\n定位：" + String(SkillDB.get_inner(sid).get("desc", ""))
-	var sk := SkillDB.get_skill(sid)
+	var branch := Game.chapter.party.active_branch(selected_character, sid) if selected_character != "" else ""
+	var sk := SkillDB.resolve(sid, branch)
 	var area := "自身" if sk["shape"] == "self" else "%d格" % int(sk["rmax"])
 	if sk["shape"] == "line":
 		area += " · 八向直线"
@@ -201,6 +202,7 @@ func _library(left: VBoxContainer, right: VBoxContainer) -> void:
 		_slot(right, "主动%d" % (i + 1), c["active"][i], "招式", i)
 	_slot(right, "内功", c["inner"], "内功", 0)
 	_slot(right, "轻功", c["lightfoot"], "轻功", 0)
+	_refine_block(right, selected_character, selected_art)
 	_text(right, "个人已学：" + "、".join(c["learned"]), 21, UIKit.MUTED)
 
 
@@ -248,3 +250,47 @@ func _party(left: VBoxContainer, right: VBoxContainer) -> void:
 		b.disabled = spent >= 4 or p.training_points(id) <= 0
 		row.add_child(b)
 	right.add_child(_button("免费重置训练点", _mutate.bind(p.reset_training.bind(id), "已返还全部训练点。"), 230, 58))
+	_mastery_block(right, id)
+
+
+func _refine_block(parent: Node, id: String, sid: String) -> void:
+	var p := Game.chapter.party
+	if not PartyState.BRANCHES.has(sid):
+		_text(parent, "此武学暂无精进分支。", 21, UIKit.MUTED)
+		return
+	_text(parent, "武学精进 · 心得 %d" % p.lesson, 25, UIKit.GOLD)
+	var current := p.active_branch(id, sid)
+	if current == "":
+		_text(parent, "未精进。消耗1心得解锁二选一，解锁后可免费切换。", 21, UIKit.MUTED)
+	else:
+		_text(parent, "已精进 · 当前分支：%s" % current, 22, UIKit.ALLY)
+	for branch in p.branch_options(sid):
+		var tip: String = String(PartyState.BRANCHES[sid][branch])
+		var label: String = ("● " if current == branch else "") + branch + " · " + tip
+		var msg := "已切换为「%s」。" % branch if current != "" else "精进「%s」成功，心得 -1。" % branch
+		var action := (p.set_branch if current != "" else p.refine).bind(id, sid, branch)
+		var b := _button(label, _mutate.bind(action, msg), 0, 48)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.disabled = (current == "" and not p.can_refine(id, sid)) or current == branch
+		parent.add_child(b)
+
+
+func _mastery_block(parent: Node, id: String) -> void:
+	var p := Game.chapter.party
+	var c: Dictionary = p.characters[id]
+	_text(parent, "可选专精（4级开放，战前可改）", 25, UIKit.GOLD)
+	if int(c["level"]) < 4:
+		_text(parent, "当前 Lv.%d · 升至4级后可从两项专精中择一。" % int(c["level"]), 21, UIKit.MUTED)
+		for mid in p.mastery_options(id):
+			_text(parent, "预备 · %s：%s" % [mid, PartyState.MASTERY_TEXT[mid]], 20, UIKit.MUTED)
+		return
+	var current: String = String(c.get("mastery", ""))
+	_text(parent, "当前专精：" + (current if current != "" else "未选择"), 22, UIKit.ALLY if current != "" else UIKit.MUTED)
+	for mid in p.mastery_options(id):
+		var label: String = ("● " if current == mid else "") + mid + " · " + PartyState.MASTERY_TEXT[mid]
+		var b := _button(label, _mutate.bind(p.set_mastery.bind(id, mid), "专精已切换为「%s」。" % mid), 0, 52)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.disabled = current == mid
+		parent.add_child(b)
+	if current != "":
+		parent.add_child(_button("清空专精", _mutate.bind(p.set_mastery.bind(id, ""), "已清空专精选择。"), 160, 48))

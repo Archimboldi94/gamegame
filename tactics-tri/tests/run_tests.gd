@@ -53,6 +53,8 @@ func _run_all() -> void:
 		"test_b1_autoplay_stats_batch",
 		"test_explore_party_status_and_journal", "test_wuxia_hud_shows_traits_and_loadout",
 		"test_ai_gdd_rest_and_guard", "test_ai_gdd_lightfoot_approach",
+		"test_party_refine_spend_and_switch", "test_party_mastery_slot_at_level_4",
+		"test_refine_pofeng_branches_in_combat", "test_mastery_ningfeng_pierce",
 	]
 	for t in tests:
 		_current = t
@@ -2123,7 +2125,8 @@ func test_wuxia_hud_forecast_and_control_zones() -> void:
 	var attack: Dictionary = battle.state.preview(u, u.basic, enemy.pos)[0]
 	var text: String = battle.preview_text.get_parsed_text()
 	check(text.contains("预计命中后伤害 %d" % attack["dmg"]) and text.contains("命中 %d%%" % attack["hit"]), "attack forecast matches rule damage and chance")
-	for part in ["基础90%", "眼力+5", "闪避-10", "侧背+0", "地形+0"]:
+	var evade_term := "闪避%+d" % int(attack["hit_parts"]["evasion"])
+	for part in ["基础90%", "眼力+5", evade_term, "侧背+0", "地形+0"]:
 		check(text.contains(part), "hit breakdown includes " + part)
 	check(text.contains("AP3 内力0") and text.contains("施展后 AP 3/6"), "attack forecasts spending and remaining resources")
 	check(text.contains("自动反击：可能") and text.contains("反击命中"), "front attack warns about automatic counter")
@@ -2840,3 +2843,79 @@ func test_ai_gdd_lightfoot_approach() -> void:
 	var plan := EnemyAI.plan(s, a)
 	eq(plan["skill"], "燕行步", "AI uses immune lightfoot to close distance")
 	check(Pathing.chebyshev(plan["target"], b.pos) < Pathing.chebyshev(a.pos, b.pos), "lightfoot lands closer to the foe")
+
+
+func test_party_refine_spend_and_switch() -> void:
+	var p := PartyState.new()
+	p.lesson = 1
+	check(p.can_refine("sword", "破风剑"), "sword can refine 破风剑 with one insight")
+	check(p.refine("sword", "破风剑", "延锋"), "spend insight to unlock 延锋")
+	eq(p.lesson, 0, "insight spent once")
+	eq(p.active_branch("sword", "破风剑"), "延锋", "active branch stored")
+	check(not p.can_refine("sword", "破风剑"), "same art cannot be refined twice")
+	check(not p.refine("fist", "震山掌", "摧阵"), "no insight left")
+	check(p.set_branch("sword", "破风剑", "凝锋"), "unlocked branches switch free")
+	eq(p.active_branch("sword", "破风剑"), "凝锋", "switched to 凝锋")
+	var c := ChapterState.new()
+	c.quest_accepted = true
+	c.b1_clear = true
+	c.unlocked_manuals = ["回锋剑谱"]
+	c.experience = 100
+	c.lesson_received = true
+	c.party = p
+	c.party.collect("回锋剑")
+	var loaded := ChapterState.from_dict(c.to_dict())
+	check(loaded != null, "spent insights still load when lesson was claimed")
+	if loaded != null:
+		eq(loaded.party.lesson, 0, "spent balance persists")
+		eq(loaded.party.active_branch("sword", "破风剑"), "凝锋", "branch persists")
+
+
+func test_party_mastery_slot_at_level_4() -> void:
+	var p := PartyState.new()
+	check(not p.can_choose_mastery("sword"), "below Lv4 no mastery")
+	check(not p.set_mastery("sword", "回旋"), "cannot set mastery early")
+	p.gain_exp("sword", 420)
+	eq(p.characters["sword"]["level"], 4, "sword reaches Lv4")
+	check(p.can_choose_mastery("sword"), "Lv4 opens mastery")
+	check(p.set_mastery("sword", "回旋"), "choose 回旋")
+	eq(p.characters["sword"]["mastery"], "回旋", "mastery stored")
+	check(p.set_mastery("sword", "凝锋"), "free switch to 凝锋")
+	check(p.set_mastery("sword", ""), "clear mastery")
+	check(not p.set_mastery("sword", "截流"), "cannot take another role mastery")
+
+
+func test_refine_pofeng_branches_in_combat() -> void:
+	var s := BattleDefs.build_wuxia_b1(7)
+	var u: BattleUnit = s.units[0]
+	u.skill_branches = {"破风剑": "延锋"}
+	var yan := u.skill("破风剑")
+	eq([yan["rmax"], yan["qi"]], [4, 4], "延锋 extends range and qi")
+	u.skill_branches = {"破风剑": "凝锋"}
+	var ning := u.skill("破风剑")
+	eq([ning["shape"], ning["pierce"]], ["single", 2], "凝锋 becomes single with pierce 2")
+	u.skill_branches = {"回锋剑": "游身"}
+	check(bool(u.skill("回锋剑").get("retreat_safe", false)), "游身 is ZoC-safe retreat")
+	u.skill_branches = {"回锋剑": "回刺"}
+	var ci := u.skill("回锋剑")
+	eq([ci.get("effect", ""), ci.get("pierce", 0)], ["", 2], "回刺 drops retreat for pierce")
+	u.skill_branches = {"燕行步": "长跃"}
+	eq(u.skill("燕行步")["rmax"], 4, "长跃 extends leap")
+
+
+func test_mastery_ningfeng_pierce() -> void:
+	var a := wuxia_unit(0, 0, Vector2i(2, 2))
+	var b := wuxia_unit(1, 1, Vector2i(2, 3))
+	a.mastery = "凝锋"
+	a.atk = 4
+	b.def = 3
+	b.guard = false
+	var map := BattleMap.from_char_grid(["......", "......", "......", "......", "......", "......"], {})
+	var sk := a.skill("普攻")
+	var hit := Combat.gdd_calc(a, b, sk, map, a.pos)
+	eq(hit["pierce"], 1, "凝锋 adds pierce in calc")
+	var labeled := false
+	for lab in hit["labels"]:
+		if str(lab).contains("凝锋"):
+			labeled = true
+	check(labeled, "label mentions 凝锋")

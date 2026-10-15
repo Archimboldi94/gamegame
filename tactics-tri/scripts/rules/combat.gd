@@ -191,18 +191,45 @@ static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: B
 			trait_hit = 5
 	hit_parts["trait"] = trait_hit
 	hit += trait_hit
-	var armor := maxi(0, tgt.def + (2 if tgt.block else 0) - int(skill.get("pierce", 0)))
+	# 藏锋: next incoming active (non-reaction) attack -5% hit
+	if not reaction and tgt.cangfeng_hits > 0:
+		hit -= 5
+		hit_parts["cangfeng"] = -5
+	# 回旋: opportunity against the retreating master is -10% once
+	if opportunity and tgt.mastery == "回旋" and not tgt.huixuan_used:
+		hit -= 10
+		hit_parts["huixuan"] = -10
+	var pierce := int(skill.get("pierce", 0))
+	if not reaction and att.mastery == "凝锋" and not att.ningfeng_used and skill["shape"] == "single" and skill["kind"] == "phys":
+		pierce += 1
+	var armor_bonus := (2 if tgt.block else 0) + (1 if tgt.chenwen_armor else 0)
+	var armor := maxi(0, tgt.def + armor_bonus - pierce)
 	var power := att.atk + int(skill["power"])
+	# 裂势: strip 护势 before damage
+	var guarded := tgt.guard and not bool(skill.get("break_guard", false))
+	if bool(skill.get("break_guard", false)) and tgt.guard:
+		# preview-only flag; execute clears for real
+		pass
 	var damage := maxi(1, power - armor)
-	if tgt.guard:
+	if guarded:
 		damage = maxi(1, floori(damage * 0.75))
 	var labels := []
 	if trait_hit > 0:
 		labels.append(att.innate_trait + " 命中+5%")
+	if hit_parts.get("cangfeng", 0) != 0:
+		labels.append("藏锋 命中-5%")
+	if hit_parts.get("huixuan", 0) != 0:
+		labels.append("回旋 借机命中-10%")
+	if pierce > int(skill.get("pierce", 0)):
+		labels.append("专精·凝锋 破甲+1")
 	if side_hit > 0:
 		labels.append(("背后" if side == "back" else "侧面") + " 命中+%d%%" % side_hit)
-	if tgt.guard:
+	if bool(skill.get("break_guard", false)) and tgt.guard:
+		labels.append("裂势 破势")
+	elif guarded:
 		labels.append("护势 -25%（一击）")
 	if tgt.block:
 		labels.append("格挡 护甲+2（一击）")
-	return {"dmg": damage, "hit": clampi(hit, 10, 95), "hit_parts": hit_parts, "side": side, "labels": labels, "heal": false, "mult": 0.75 if tgt.guard else 1.0}
+	if tgt.chenwen_armor:
+		labels.append("沉稳 护甲+1")
+	return {"dmg": damage, "hit": clampi(hit, 10, 95), "hit_parts": hit_parts, "side": side, "labels": labels, "heal": false, "mult": 0.75 if guarded else 1.0, "pierce": pierce}
