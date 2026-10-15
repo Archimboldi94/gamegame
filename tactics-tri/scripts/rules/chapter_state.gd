@@ -17,7 +17,12 @@ var lesson_received := false
 var stance := ""
 var unlocked_manuals: Array[String] = []
 var experience := 0
-var insights := 0
+var party := PartyState.new()
+var insights: int:
+	get:
+		return party.lesson
+	set(value):
+		party.lesson = value
 var escort_relation := 0
 var sect_relation := 0
 # Reserved progress for the later B2/B3 slice; no premature chapter completion.
@@ -79,6 +84,8 @@ func apply_event(event_id: String, context: Dictionary = {}) -> bool:
 			if not unlocked_manuals.has("回锋剑谱"):
 				unlocked_manuals.append("回锋剑谱")
 			experience += 100
+			party.collect("回锋剑")
+			party.award_battle_exp(100, context.get("deployed", PartyState.IDS))
 		"reversal_lesson":
 			lesson_received = true
 			insights += 1
@@ -94,7 +101,7 @@ func apply_event(event_id: String, context: Dictionary = {}) -> bool:
 
 func to_dict() -> Dictionary:
 	return {
-		"version": 1, "quest_accepted": quest_accepted, "b1_clear": b1_clear,
+		"version": 2, "party": party.to_dict(), "quest_accepted": quest_accepted, "b1_clear": b1_clear,
 		"lesson_received": lesson_received, "stance": stance,
 		"unlocked_manuals": unlocked_manuals.duplicate(), "experience": experience,
 		"insights": insights, "escort_relation": escort_relation, "sect_relation": sect_relation,
@@ -107,7 +114,7 @@ func to_dict() -> Dictionary:
 
 
 static func from_dict(data: Dictionary) -> ChapterState:
-	if data.get("version", 0) != 1:
+	if not PartyState._integer(data.get("version"), 1, 2):
 		return null
 	var s := ChapterState.new()
 	for key in ["quest_accepted", "b1_clear", "lesson_received", "b2_clear", "b3_clear", "ledger_received", "complete"]:
@@ -150,6 +157,19 @@ static func from_dict(data: Dictionary) -> ChapterState:
 		return null
 	if s.complete and not (s.b3_clear and s.ledger_received):
 		return null
+	if data["version"] == 2:
+		if not data.get("party") is Dictionary:
+			return null
+		var loaded_party := PartyState.from_dict(data["party"])
+		if loaded_party == null or loaded_party.lesson != s.insights:
+			return null
+		s.party = loaded_party
+		if s.b1_clear and not s.party.library.has("回锋剑"):
+			return null
+	elif s.b1_clear:
+		# Upgrade old chapter saves once; the new version persists personal rewards.
+		s.party.collect("回锋剑")
+		s.party.award_battle_exp(100, PartyState.IDS)
 	return s
 
 

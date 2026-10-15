@@ -175,7 +175,7 @@ static func calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: Battl
 
 
 ## B1 data gives weapon/skill power plus the unit's strength. No side damage multiplier.
-static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: BattleMap, from: Vector2i, reaction := false) -> Dictionary:
+static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: BattleMap, from: Vector2i, reaction := false, opportunity := false) -> Dictionary:
 	var side := relative_side(tgt.pos, tgt.facing, from)
 	var side_hit := 10 if side == "back" else (5 if side == "side" else 0)
 	var hit_parts := {"base": int(skill.get("base_hit", 90)), "accuracy": att.acc, "evasion": -tgt.eva,
@@ -183,12 +183,22 @@ static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: B
 	var hit := int(hit_parts["base"]) + att.acc - tgt.eva - map.evasion(tgt.pos) + side_hit
 	if reaction:
 		hit -= 10
+	var trait_hit := 0
+	if att.use_gdd_rules:
+		if not reaction and att.innate_trait == "游锋" and att.moved_tiles >= 2 and not att.youfeng_used and skill["shape"] == "single" and skill["kind"] == "phys":
+			trait_hit = 5
+		if opportunity and att.innate_trait == "守线" and not att.shouxian_used:
+			trait_hit = 5
+	hit_parts["trait"] = trait_hit
+	hit += trait_hit
 	var armor := maxi(0, tgt.def + (2 if tgt.block else 0) - int(skill.get("pierce", 0)))
 	var power := att.atk + int(skill["power"])
 	var damage := maxi(1, power - armor)
 	if tgt.guard:
 		damage = maxi(1, floori(damage * 0.75))
 	var labels := []
+	if trait_hit > 0:
+		labels.append(att.innate_trait + " 命中+5%")
 	if side_hit > 0:
 		labels.append(("背后" if side == "back" else "侧面") + " 命中+%d%%" % side_hit)
 	if tgt.guard:

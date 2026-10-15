@@ -101,10 +101,15 @@ func begin_next_turn() -> Dictionary:
 				for other in units:
 					if other.alive():
 						other.rp = 1
+						other.shouxian_used = false
 			u.qi_blocked = u.ap_penalty > 0
 			u.ap = maxi(0, u.max_ap - mini(2, u.ap_penalty))
 			u.ap_penalty = 0
-			u.qi = mini(u.max_qi, u.qi + 1 + int(SkillDB.get_inner(u.inner).get("start_qi", 0)))
+			u.qi = mini(u.max_qi, u.qi + 1 + int(SkillDB.get_inner(u.inner).get("start_qi", 0)) + (1 if u.tongmai_pending else 0))
+			u.tongmai_pending = false
+			u.tongmai_triggered = false
+			u.moved_tiles = 0
+			u.youfeng_used = false
 			u.used_skills.clear()
 		if map.effect_at(u.pos) == "fire":
 			var burn := u.take_damage(maxi(3, u.max_hp / 10))
@@ -193,6 +198,7 @@ func move_unit(u: BattleUnit, to: Vector2i) -> Array:
 				path = path.slice(0, i)  # died before leaving
 				break
 			u.pos = step_to
+			u.moved_tiles += 1
 			u.facing = Combat.dir_toward(from, step_to, u.facing)
 		moved = true
 		u.facing = auto_facing(u)
@@ -232,7 +238,7 @@ func path_reactions(u: BattleUnit, path: Array, immune := false, initial_facing 
 			subject.eva = u.eva
 			subject.guard = u.guard
 			subject.block = u.block
-			var e := Combat.gdd_calc(source, subject, SkillDB.get_skill(source.basic), map, source.pos, true)
+			var e := Combat.gdd_calc(source, subject, SkillDB.get_skill(source.basic), map, source.pos, true, true)
 			e.merge({"source": source, "from": path[i - 1], "to": path[i], "step": i})
 			out.append(e)
 			break
@@ -443,6 +449,7 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 					if not u.alive():
 						break
 					u.pos = dest
+					u.moved_tiles += 1
 					u.facing = Combat.dir_toward(old, dest, u.facing)
 					events.append({"type": "leap", "unit": u, "from": old, "to": dest})
 				if u.alive() and u.pos == tile and bool(sk.get("landing_guard", false)):
@@ -454,6 +461,8 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 		last_target = tile
 		u.facing = Combat.dir_toward(from, tile, u.facing)
 	var entries := preview(u, sid, tile, from)
+	if u.use_gdd_rules and u.innate_trait == "游锋" and u.moved_tiles >= 2 and not u.youfeng_used and sk["shape"] == "single" and sk["kind"] == "phys":
+		u.youfeng_used = true # the next attack consumes the bonus even if it misses
 	for e in entries:
 		var t: BattleUnit = e["unit"]
 		if e["heal"]:
@@ -468,6 +477,9 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 			continue
 		var dealt := t.take_damage(e["dmg"])
 		if u.use_gdd_rules:
+			if u.innate_trait == "通脉" and not u.tongmai_triggered and sk.get("effect", "") in ["seal", "wuxia_push"]:
+				u.tongmai_pending = true
+				u.tongmai_triggered = true
 			t.guard = false
 			t.block = false
 		events.append({"type": "damage", "unit": t, "by": u, "amount": dealt, "side": e["side"], "killed": not t.alive()})
@@ -523,6 +535,7 @@ func _retreat(u: BattleUnit, sk: Dictionary, target: Vector2i) -> Array:
 	if u.alive():
 		var old := u.pos
 		u.pos = dest
+		u.moved_tiles += 1
 		events.append({"type": "retreat", "unit": u, "from": old, "to": dest})
 	return events
 
@@ -592,7 +605,9 @@ func _resolve_reaction(reactor: BattleUnit, target: BattleUnit, opportunity: boo
 	var sk := SkillDB.get_skill(reactor.basic)
 	var e: Dictionary
 	if reactor.use_gdd_rules:
-		e = Combat.gdd_calc(reactor, target, sk, map, reactor.pos, true)
+		e = Combat.gdd_calc(reactor, target, sk, map, reactor.pos, true, opportunity)
+		if opportunity and reactor.innate_trait == "守线":
+			reactor.shouxian_used = true
 	else:
 		e = Combat.calc(reactor, target, sk, map, reactor.pos)
 	var tag := "opportunity" if opportunity else "counter"

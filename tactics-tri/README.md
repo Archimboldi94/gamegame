@@ -17,6 +17,17 @@ godot --headless --path . -s tests/run_tests.gd # 规则测试，输出 PASS/FAI
 godot --headless --path . --export-debug Android build/tactics-tri.apk  # 导出 APK
 ```
 
+## 队伍成长与谱库
+
+探索中按 Esc 查看个人等级、EXP、七项属性与训练点；客栈 P 打开队伍谱库，按招式／内功／轻功分类，选择角色后可免费学习、装配和卸下。客栈 G 仍提供一次性心得，也可进入成长界面。每项训练最多4点，可免费重置；心得仅保存数量，暂不开放精进。
+
+探索进入 B1 使用个人成长与装配，标题「渡口截箱」保留 JSON 默认配置。探索初始配置留空尚未取得的回锋剑和兵器不兼容槽位；B1 首胜后队伍收录《回锋剑谱》，每名出战成员各得100 EXP，倒地仍结算。旧章节存档会迁移，截图模式不会写入玩家存档。
+
+```bash
+godot --path . --resolution 1600x900 -- --shot=library --out=/workspace/art-slice/progress/library.png --frames=40
+godot --path . --resolution 1600x900 -- --shot=party --out=/workspace/art-slice/progress/party.png --frames=40
+```
+
 ## 目录
 - `scripts/rules/` 规则与数据；`scripts/game/` 场景与表现；`scenes/` 场景
 - `data/wuxia/` B1 地图与战斗数据；`assets/` 运行时贴图；`audio/`、`fonts/`

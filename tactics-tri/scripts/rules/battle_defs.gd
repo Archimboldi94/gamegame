@@ -151,7 +151,7 @@ static func _vec_facing(arr: Array) -> int:
 	return Combat.dir_toward(Vector2i.ZERO, Vector2i(int(arr[0]), int(arr[1])), 4)
 
 
-static func build_wuxia_b1(seed := 7) -> BattleState:
+static func build_wuxia_b1(seed := 7, party: PartyState = null) -> BattleState:
 	var map_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_map.json"))
 	var combat_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_combat.json"))
 	var map := BattleMap.from_char_grid(map_raw["terrain_grid"], map_raw.get("markers", {}))
@@ -197,15 +197,19 @@ static func build_wuxia_b1(seed := 7) -> BattleState:
 		u.title = "青崖渡同行" if u.team == BattleUnit.PLAYER else "渡口劫匪"
 		u.ai = "aggressive"
 		u.cls = "lancer" if u.weapon == "spear" else "swordsman"
+		if u.team == BattleUnit.PLAYER:
+			u.innate_trait = PartyState.TRAITS[PartyState.IDS[u.id]]
+			if party != null:
+				party.apply_to_unit(u)
 		units.append(u)
 	var s := BattleState.new()
 	s.setup(map, units, "all", seed)
 	return s
 
 
-static func build_state(id: String, seed := 7) -> BattleState:
+static func build_state(id: String, seed := 7, party: PartyState = null) -> BattleState:
 	if id == "wuxia_b1":
-		return build_wuxia_b1(seed)
+		return build_wuxia_b1(seed, party)
 	var d: Dictionary = DEFS[id]
 	var units := []
 	var next_id := 0

@@ -3,6 +3,7 @@ extends Node2D
 
 const Player := preload("res://scripts/game/explore_player.gd")
 const Minimap := preload("res://scripts/game/explore_minimap.gd")
+const PreparationPanel := preload("res://scripts/game/party_panel.gd")
 const TILE := ExplorationRules.TILE
 
 var area := "outdoor"
@@ -27,6 +28,7 @@ var font := preload("res://fonts/DroidSansFallbackFull.ttf")
 var autosave_time := 0.0
 var last_saved_position := Vector2.ZERO
 var minimap: Node2D
+var party_panel: Control
 
 
 func _ready() -> void:
@@ -65,6 +67,9 @@ func _ready() -> void:
 		_show_dialogue("渡口见闻", Game.explore_notice)
 		Game.explore_notice = ""
 	queue_redraw()
+	if Game.shot in ["library", "party"]:
+		place_label.hide()
+		_show_preparation(Game.shot, "sword")
 
 
 func _build_objects() -> void:
@@ -155,7 +160,7 @@ func _build_npcs() -> void:
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(player):
 		return
-	player.blocked = modal.visible
+	player.blocked = modal.visible or party_panel.visible
 	_update_camera()
 	_update_nearest()
 	autosave_time += delta
@@ -187,7 +192,7 @@ func _update_nearest() -> void:
 	if best != nearest:
 		nearest = best
 		queue_redraw()
-	prompt.visible = nearest != "" and not modal.visible
+	prompt.visible = nearest != "" and not modal.visible and not party_panel.visible
 	for obj in objects:
 		if obj["id"] == nearest:
 			prompt_label.text = "%s   [E]%s" % [obj["name"], obj["verb"]]
@@ -195,6 +200,11 @@ func _update_nearest() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.echo:
+		return
+	if party_panel.visible:
+		if event.is_action_pressed("ui_cancel") or event.is_action_pressed("explore_journal"):
+			party_panel.close()
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("explore_journal"):
 		if modal.visible:
@@ -248,10 +258,7 @@ func interact(object_id: String) -> bool:
 		"meng", "luo":
 			_stance_dialogue(object_id)
 		"codex":
-			var manuals := "尚未收录秘籍。调查渡口可获得《回锋剑谱》。" if Game.chapter.unlocked_manuals.is_empty() else ""
-			for manual in Game.chapter.unlocked_manuals:
-				manuals += "《%s》 · 已收录\n" % manual
-			_show_dialogue("武学谱库 · 队伍已收录", manuals + "\n收录记录属于队伍；个人学习与装配后续开放。")
+			_show_preparation("library")
 		"training":
 			if not Game.chapter.b1_clear:
 				_show_dialogue("演武区", "先去渡口历练。夺回封箱后，可在此整理反击的体会，领取一份武学心得。")
@@ -259,6 +266,7 @@ func interact(object_id: String) -> bool:
 				_show_dialogue("演武区", "这份回锋心得已领过。静心温习，不再重复领取。\n当前武学心得：%d" % Game.chapter.insights)
 			else:
 				_show_dialogue("演武区 · 回锋心得", "借来势，收剑再回锋。将渡口一战的体会记下来，可得武学心得 +1。", "整理心得", _commit_dialogue.bind("reversal_lesson", "武学心得 +1。可随时回访，立场选择不会影响这份心得。"))
+			modal_buttons.add_child(UIKit.battle_button("队伍成长", _show_preparation.bind("party"), 220, 84))
 		"bamboo_event", "shrine_event":
 			var event_id := "bamboo_battle_start" if object_id == "bamboo_event" else "shrine_battle_start"
 			if not Game.chapter.can_event(event_id):
@@ -382,6 +390,15 @@ func _build_ui() -> void:
 	place_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ui.add_child(place_label)
 	_build_modal()
+	party_panel = PreparationPanel.new()
+	ui.add_child(party_panel)
+	party_panel.closed.connect(func():
+		player.blocked = false
+		minimap.show()
+		_update_nearest()
+	)
+	party_panel.changed.connect(_refresh_ui)
+	party_panel.return_to_title.connect(_save_and_title)
 
 
 func _position_minimap() -> void:
@@ -416,6 +433,8 @@ func _build_modal() -> void:
 
 
 func _show_dialogue(title: String, text: String, confirm_text := "", action := Callable()) -> void:
+	if is_instance_valid(party_panel) and party_panel.visible:
+		party_panel.close()
 	modal_title.text = title
 	modal_text.text = text
 	UIKit.clear(modal_buttons)
@@ -449,7 +468,16 @@ func _show_journal() -> void:
 
 func _show_pause() -> void:
 	_sync_position()
-	_show_dialogue("行囊 · 队伍", "同行：剑客 / 枪客 / 拳师\n经验记录：%d    武学心得：%d\n镖局关系：%d    青岚门关系：%d\n\n行路位置自动保存；关键选择与奖励即时保存。" % [Game.chapter.experience, Game.chapter.insights, Game.chapter.escort_relation, Game.chapter.sect_relation], "保存并返回标题", _save_and_title)
+	_show_preparation("party")
+
+
+func _show_preparation(page: String, character := "") -> void:
+	_close_dialogue()
+	_sync_position()
+	party_panel.open(page, character)
+	minimap.hide()
+	player.blocked = true
+	prompt.hide()
 
 
 func _save_and_title() -> void:
@@ -462,7 +490,7 @@ func _save_and_title() -> void:
 
 func _refresh_ui() -> void:
 	objective_label.text = "当前 · " + Game.chapter.objective()
-	status_label.text = "经验 %d    心得 %d    队伍已收录 %d 部秘籍" % [Game.chapter.experience, Game.chapter.insights, Game.chapter.unlocked_manuals.size()]
+	status_label.text = "同行三人独立成长    心得 %d    队伍谱库 %d 门武学" % [Game.chapter.party.lesson, Game.chapter.party.library.size()]
 
 
 func _draw() -> void:

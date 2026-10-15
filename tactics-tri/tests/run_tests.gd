@@ -44,6 +44,11 @@ func _run_all() -> void:
 		"test_exploration_outdoor_reachability", "test_exploration_scene_interactions",
 		"test_exploration_doors_and_collision",
 		"test_exploration_battle_return_flow",
+		"test_party_exp_curve_carry_cap", "test_party_exp_distribution_and_catchup",
+		"test_party_training_stats_reset", "test_party_shared_library_independent_learning",
+		"test_party_weapon_compatibility_and_slots", "test_party_chapter_round_trip_and_migration",
+		"test_trait_youfeng", "test_trait_shouxian", "test_trait_tongmai",
+		"test_party_preparation_ui", "test_party_exploration_loadout",
 	]
 	for t in tests:
 		_current = t
@@ -1168,8 +1173,8 @@ func test_exploration_scene_interactions() -> void:
 	check(not scene.modal_action.is_valid(), "scene repeat lesson has no reward action")
 	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["codex"]) + Vector2(0, 42)
 	scene.interact("codex")
-	check(scene.modal_title.text.contains("队伍已收录"), "codex first shows shared collection")
-	check(scene.modal_text.text.contains("回锋剑谱"), "collected sword manual visible")
+	check(scene.party_panel.visible and scene.party_panel.selected_character == "", "codex first shows shared collection before choosing a character")
+	check(_control_has_text(scene.party_panel, "回锋剑谱"), "collected sword manual visible")
 	scene.free()
 	game.chapter = old_chapter
 	game.shot = old_shot
@@ -1284,6 +1289,8 @@ func test_exploration_battle_return_flow() -> void:
 		if is_instance_valid(battle.overlay):
 			battle.overlay.queue_free()
 			battle.overlay = null
+		if result == "win":
+			battle.state.units[0].hp = 0 # fallen deployed member still gets full EXP
 		battle._finish(result)
 		eq(game.chapter.to_dict(), entry, "result display does not grant early rewards")
 		battle.overlay_confirm.call()
@@ -1297,6 +1304,8 @@ func test_exploration_battle_return_flow() -> void:
 			eq(explore.player.position, Vector2(entry["player_position"][0], entry["player_position"][1]), "defeat returns to exact entry world position")
 		else:
 			check(game.chapter.b1_clear, "scene victory submits B1 flag")
+			for id in PartyState.IDS:
+				eq(game.chapter.party.characters[id]["level"], 2, "deployed member gains full 100 EXP, including fallen " + id)
 			eq(game.chapter.experience, 100, "scene victory records 100 exp")
 			eq(game.chapter.unlocked_manuals, ["回锋剑谱"], "scene victory records shared manual")
 			eq(explore.player.position, ExplorationRules.center(Vector2i(37, 22)), "victory returns to GDD safe position")
@@ -2219,3 +2228,445 @@ func test_wuxia_hud_skill_availability() -> void:
 	battle.free()
 	game.shot = old_shot
 	game.current_battle = old_battle
+
+
+# GDD 5.4–5.6, 6.4 #24–27 (fixed traits and weapon compatibility only), 9.1–9.3.
+func test_party_exp_curve_carry_cap() -> void:
+	var p := PartyState.new()
+	for level in range(1, 10):
+		eq(PartyState.exp_to_next(level), 100 + 40 * (level - 1), "personal EXP curve at level " + str(level))
+	eq(p.gain_exp("sword", 99), 0, "99 EXP does not level")
+	eq(p.characters["sword"]["exp"], 99, "EXP retained below threshold")
+	eq(p.gain_exp("sword", 142), 2, "overflow can cross multiple levels")
+	eq([p.characters["sword"]["level"], p.characters["sword"]["exp"]], [3, 1], "100 + 140 consumed with one carried")
+	eq([p.characters["spear"]["level"], p.characters["spear"]["exp"]], [1, 0], "other character progression is independent")
+	eq(p.training_points("sword"), 2, "one training point per level")
+	eq(p.stats("sword")["max_hp"], 37, "two levels add six HP")
+	eq(p.gain_exp("sword", 100000), 7, "level ceiling is ten")
+	eq([p.characters["sword"]["level"], p.characters["sword"]["exp"]], [10, 0], "no EXP stored at ceiling")
+	eq(p.gain_exp("sword", 100), 0, "capped unit cannot level")
+	eq(p.characters["sword"]["exp"], 0, "capped unit gains no EXP")
+	var snapshot := p.to_dict()
+	p.gain_exp("spear", -1)
+	p.gain_exp("unknown", 100)
+	eq(p.to_dict(), snapshot, "invalid EXP leaves state unchanged")
+
+
+func test_party_exp_distribution_and_catchup() -> void:
+	var p := PartyState.new()
+	eq(p.award_battle_exp(100, ["sword", "fist"]), {"sword": 100, "spear": 60, "fist": 100}, "GDD24: deployed and reserves receive separate rewards")
+	eq([p.characters["sword"]["level"], p.characters["spear"]["exp"], p.characters["fist"]["level"]], [2, 60, 2], "control and front-line roles receive full reward without kill counts")
+	p = PartyState.new()
+	p.gain_exp("sword", 420) # level 4
+	p.gain_exp("spear", 420)
+	eq(p.level_baseline(), 4.0, "median of highest three levels")
+	eq(p.award_battle_exp(120, ["sword", "spear"])["fist"], 108, "reserve times catchup: 120 * 0.6 * 1.5 = 108")
+	eq([p.characters["fist"]["level"], p.characters["fist"]["exp"]], [2, 8], "reserve catches up and carries eight EXP")
+	p = PartyState.new()
+	p.gain_exp("sword", 240) # level 3
+	p.gain_exp("spear", 240)
+	eq(p.award_battle_exp(100, PartyState.IDS)["fist"], 150, "exactly two levels behind gains catchup as deployed")
+	p = PartyState.new()
+	p.gain_exp("sword", 100)
+	p.gain_exp("spear", 100)
+	eq(p.award_battle_exp(100, ["sword", "spear"])["fist"], 60, "one level behind does not gain catchup")
+	p = PartyState.new()
+	p.gain_exp("sword", 99)
+	p.gain_exp("spear", 99)
+	eq(p.award_battle_exp(240, PartyState.IDS)["fist"], 240, "baseline uses pre-award levels even if first two level up")
+	# Highest three, and median with fewer members, are part of the distribution contract.
+	p.characters["sword"]["level"] = 8
+	p.characters["spear"]["level"] = 6
+	p.characters["fist"]["level"] = 2
+	p.characters["guest"] = {"level": 1}
+	eq(p.level_baseline(), 6.0, "fourth low-level member cannot drag down baseline")
+	p.characters.erase("guest")
+	p.characters.erase("fist")
+	eq(p.level_baseline(), 7.0, "two-member median averages middle levels")
+
+
+func test_party_training_stats_reset() -> void:
+	var p := PartyState.new()
+	var base := p.stats("sword")
+	check(not p.train("sword", "强身"), "level one has no training points")
+	p.gain_exp("sword", 100000)
+	for direction in PartyState.TRAINING:
+		p.reset_training("sword")
+		for i in 4:
+			check(p.train("sword", direction), direction + " can invest point " + str(i + 1))
+		check(not p.train("sword", direction), direction + " capped at four")
+		var values := p.stats("sword")
+		var bonus: Array = PartyState.TRAINING[direction]
+		for stat in ["max_hp", "strength", "armor", "accuracy", "evasion", "speed", "qi"]:
+			var expected := int(base[stat]) + (27 if stat == "max_hp" else 0)
+			if stat == bonus[0]:
+				expected += 4 * int(bonus[1])
+			eq(values[stat], expected, direction + " changes exactly its intended stat: " + stat)
+		eq(p.training_points("sword"), 5, "four of nine points spent")
+	p.reset_training("sword")
+	for direction in PartyState.TRAINING:
+		check(p.train("sword", direction), "seven training directions available")
+	p.train("sword", "调元")
+	p.train("sword", "强身")
+	check(not p.train("sword", "蓄劲"), "cannot spend more points than earned")
+	check(not p.train("sword", "不存在"), "unknown training direction rejected")
+	p.reset_training("sword")
+	eq(p.training_points("sword"), 9, "free reset refunds every point")
+	eq(p.stats("sword")["max_hp"], base["max_hp"] + 27, "reset preserves automatic level HP")
+	eq(p.stats("spear")["max_hp"], 36, "training does not leak to other characters")
+	p.train("sword", "迅捷")
+	var s := BattleDefs.build_wuxia_b1(7, p)
+	var u: BattleUnit = s.units[0]
+	u.qi = 0
+	s.begin_next_turn()
+	eq([u.spd, u.max_ap, u.ap, u.rp], [91, 6, 6, 1], "speed training affects initiative without AP or RP")
+	eq(u.qi, 2, "training does not increase natural recovery")
+
+
+func test_party_shared_library_independent_learning() -> void:
+	var p := PartyState.new()
+	check(not p.library.has("回锋剑"), "reward art is initially undiscovered")
+	check(not p.learn("sword", "回锋剑"), "undiscovered art cannot be learned")
+	check(not p.equip("sword", "回锋剑"), "undiscovered art cannot be equipped")
+	check(p.collect("回锋剑"), "one manual unlocks shared library")
+	check(not p.collect("回锋剑"), "collection does not duplicate manual")
+	check(not p.characters["sword"]["learned"].has("回锋剑"), "collected does not imply learned")
+	check(not p.equip("sword", "回锋剑"), "collected but unlearned cannot equip")
+	p.lesson = 3
+	var before := [p.characters["sword"]["exp"], p.training_points("sword"), p.lesson]
+	check(p.learn("sword", "回锋剑"), "first character learns free")
+	eq([p.characters["sword"]["exp"], p.training_points("sword"), p.lesson], before, "learning costs no EXP, training points, or insights")
+	check(not p.characters["spear"]["learned"].has("回锋剑"), "learning is personal")
+	check(p.learn("spear", "回锋剑"), "another character learns same manual regardless of current weapon")
+	check(p.library.has("回锋剑"), "manual remains in shared collection")
+	check(not p.characters["fist"]["learned"].has("回锋剑"), "third character remains unlearned")
+	check(p.equip("sword", "回锋剑", 2), "compatible learned art equips")
+	eq(p.characters["spear"]["active"].has("回锋剑"), false, "equipment is personal")
+	check(not p.learn("sword", "回锋剑"), "repeated learning is a no-op")
+
+
+func test_party_weapon_compatibility_and_slots() -> void:
+	var p := PartyState.new()
+	p.collect("回锋剑")
+	p.learn("spear", "回锋剑")
+	var before := p.to_dict()
+	check(not p.equip("spear", "回锋剑", 0), "incompatible weapon cannot equip sword art")
+	eq(p.to_dict(), before, "incompatible equip is atomic")
+	check(p.set_weapon("spear", "sword"), "weapon can change during preparation")
+	eq(p.characters["spear"]["active"], ["", "", ""], "weapon change automatically clears incompatible spear arts")
+	check(p.equip("spear", "回锋剑", 0), "learned sword art becomes available with sword")
+	check(p.equip("spear", "回锋剑", 2), "art moves between slots")
+	eq(p.characters["spear"]["active"], ["", "", "回锋剑"], "same art cannot occupy multiple active slots")
+	check(not p.equip("spear", "回锋剑", 3), "fourth active slot is invalid")
+	check(not p.equip("spear", "苍松功", 0, "招式"), "inner cannot take active slot")
+	check(not p.equip("spear", "踏雪步", 0, "内功"), "lightfoot cannot take inner slot")
+	check(p.equip("spear", "", 0, "内功"), "inner can be unequipped")
+	check(p.equip("spear", "苍松功", 0, "内功"), "learned inner can be reequipped")
+	check(p.equip("spear", "", 0, "轻功"), "lightfoot can be unequipped")
+	check(p.equip("spear", "踏雪步", 0, "轻功"), "learned lightfoot can be reequipped")
+	p.set_weapon("spear", "spear")
+	check(p.characters["spear"]["learned"].has("回锋剑"), "weapon change never forgets learned art")
+	check(not p.characters["spear"]["active"].has("回锋剑"), "weapon change invalidates equipped sword art")
+	p.collect("回锋剑")
+	p.learn("sword", "回锋剑")
+	p.equip("sword", "回锋剑", 1)
+	p.equip("sword", "", 1)
+	eq(p.characters["sword"]["active"][1], "", "active art can be unequipped")
+	var s := BattleDefs.build_wuxia_b1(7, p)
+	check(not s.skill_usable(s.units[1], "回锋剑"), "weapon-invalid art cannot be cast in battle")
+
+
+func test_party_chapter_round_trip_and_migration() -> void:
+	var c := ChapterState.new()
+	c.apply_event("quest_start")
+	c.apply_event("b1_clear", {"result": "win", "deployed": ["sword", "fist"]})
+	eq([c.party.characters["sword"]["level"], c.party.characters["spear"]["exp"]], [2, 60], "chapter victory distributes personal EXP")
+	check(c.party.library.has("回锋剑"), "chapter victory collects reward art")
+	c.apply_event("reversal_lesson")
+	eq(c.party.lesson, 1, "GDD14.2 lesson is stored with party")
+	c.party.gain_exp("sword", 321)
+	c.party.train("sword", "调元")
+	c.party.learn("sword", "回锋剑")
+	c.party.learn("spear", "回锋剑")
+	c.party.equip("sword", "回锋剑", 2)
+	c.party.equip("fist", "", 0, "轻功")
+	var path := "user://party_state_round_trip_test.json"
+	eq(c.save_to_file(path), OK, "chapter and party saved atomically")
+	var loaded := ChapterState.load_from_file(path)
+	check(loaded != null, "party chapter loads from JSON")
+	if loaded != null:
+		eq(loaded.to_dict(), c.to_dict(), "personal levels EXP training learning equipment lesson round trip")
+		loaded.party.reset_training("sword")
+		check(not c.party.characters["sword"]["training"].is_empty(), "loaded data does not alias original")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var legacy := c.to_dict()
+	legacy["version"] = 1
+	legacy.erase("party")
+	loaded = ChapterState.from_dict(legacy)
+	check(loaded != null, "old chapter save migrates")
+	if loaded != null:
+		eq(loaded.party.characters["sword"]["level"], 2, "legacy B1 EXP becomes personal EXP once")
+		eq(loaded.party.lesson, 1, "legacy insights migrate")
+		var upgraded := ChapterState.from_dict(loaded.to_dict())
+		eq(upgraded.party.to_dict(), loaded.party.to_dict(), "new save reload never reapplies legacy reward")
+	for damage in ["training", "exp", "equipment", "library", "lesson"]:
+		var bad := c.to_dict()
+		match damage:
+			"training": bad["party"]["characters"]["sword"]["training"]["强身"] = 5
+			"exp": bad["party"]["characters"]["sword"]["exp"] = -1
+			"equipment": bad["party"]["characters"]["fist"]["active"][0] = "破风剑"
+			"library": bad["party"]["library"].erase("回锋剑")
+			"lesson": bad["party"]["lesson"] = 2
+		check(ChapterState.from_dict(bad) == null, "reject corrupt personal " + damage)
+
+
+func test_trait_youfeng() -> void:
+	var a := wuxia_unit(0, 0, Vector2i(1, 2))
+	a.innate_trait = "游锋"
+	var b := wuxia_unit(1, 1, Vector2i(4, 2))
+	b.facing = 6
+	b.rp = 0
+	var s := state_with(BattleMap.flat(9, 9), [a, b])
+	s.begin_next_turn()
+	b.rp = 0
+	s.move_unit(a, Vector2i(2, 2))
+	eq(s.preview(a, "普攻", b.pos)[0]["hit_parts"]["trait"], 0, "one tile does not activate Youfeng")
+	s.move_unit(a, Vector2i(3, 2))
+	eq(a.moved_tiles, 2, "movement accumulates across separate commands")
+	eq(s.preview(a, "普攻", b.pos)[0]["hit_parts"]["trait"], 5, "two tiles activate next single attack")
+	eq(s.preview(a, "破风剑", b.pos)[0]["hit_parts"]["trait"], 0, "area attack receives no Youfeng")
+	eq(Combat.gdd_calc(a, b, SkillDB.get_skill("普攻"), s.map, a.pos, true)["hit_parts"]["trait"], 0, "reaction cannot receive Youfeng")
+	check(not a.youfeng_used, "previews do not consume trait")
+	s.execute(a, "守关式", a.pos)
+	check(not a.youfeng_used, "self buff does not consume single attack bonus")
+	a.ap = 20
+	s.execute(a, "破风剑", b.pos)
+	check(not a.youfeng_used, "area attack does not consume single attack bonus")
+	force_next_wuxia_miss(s)
+	s.execute(a, "普攻", b.pos)
+	check(a.youfeng_used, "miss consumes next attack bonus")
+	eq(s.preview(a, "普攻", b.pos)[0]["hit_parts"]["trait"], 0, "subsequent attack has no second bonus")
+	s.end_turn()
+	s.begin_next_turn()
+	s.end_turn()
+	s.begin_next_turn()
+	eq([a.moved_tiles, a.youfeng_used], [0, false], "Youfeng resets on next own action")
+	# Lightfoot movement counts; forced displacement does not.
+	a.ap = 20
+	a.qi = 12
+	s.execute(a, "燕行步", Vector2i(3, 4))
+	check(a.moved_tiles >= 2, "lightfoot counts actual travelled tiles")
+	var before := b.moved_tiles
+	s._wuxia_push(b, a.pos)
+	eq(b.moved_tiles, before, "being pushed does not prepare Youfeng")
+	a.use_gdd_rules = false
+	a.youfeng_used = false
+	eq(Combat.gdd_calc(a, b, SkillDB.get_skill("普攻"), s.map, a.pos)["hit_parts"]["trait"], 0, "traits excluded from classic rule path")
+
+
+func test_trait_shouxian() -> void:
+	var a := wuxia_unit(0, 0, Vector2i(3, 3))
+	a.innate_trait = "守线"
+	a.facing = 0
+	var b := wuxia_unit(1, 1, Vector2i(3, 2))
+	var s := state_with(BattleMap.flat(8, 8), [a, b])
+	s.begin_next_turn()
+	var risk := s.path_reactions(b, [b.pos, Vector2i(3, 1)])
+	eq(risk[0]["hit_parts"]["trait"], 5, "first legal opportunity preview gains five hit")
+	check(not a.shouxian_used, "opportunity preview does not consume Shouxian")
+	b.pos = Vector2i(3, 5)
+	eq(s._resolve_reaction(a, b, true), [], "illegal reaction rejected")
+	check(not a.shouxian_used, "illegal reaction does not consume trait")
+	b.pos = Vector2i(3, 2)
+	s._resolve_reaction(a, b, false)
+	check(not a.shouxian_used, "counter does not consume opportunity trait")
+	a.rp = 1
+	force_next_wuxia_miss(s)
+	var events := s._resolve_reaction(a, b, true)
+	check(not events[0]["hit"], "deterministic opportunity miss")
+	check(a.shouxian_used, "legal opportunity consumes trait even on miss")
+	eq(a.rp, 0, "Shouxian does not grant extra RP")
+	a.rp = 1 # isolate the once-per-round limit from normal RP limit
+	eq(Combat.gdd_calc(a, b, SkillDB.get_skill(a.basic), s.map, a.pos, true, true)["hit_parts"]["trait"], 0, "second opportunity in round has no bonus")
+	s.end_turn()
+	s.begin_next_turn()
+	check(a.shouxian_used, "another actor's action does not reset Shouxian")
+	s.end_turn()
+	s.begin_next_turn()
+	check(not a.shouxian_used, "new round resets Shouxian")
+	eq(a.rp, 1, "new round restores exactly one RP")
+	eq(Combat.gdd_calc(a, b, SkillDB.get_skill(a.basic), s.map, a.pos, true)["hit_parts"]["trait"], 0, "automatic counter never gets opportunity bonus")
+
+
+func test_trait_tongmai() -> void:
+	for sid in ["截脉指", "震山掌", "挑枪"]:
+		var a := wuxia_unit(0, 0, Vector2i(2, 2))
+		a.innate_trait = "通脉"
+		a.skills.append("挑枪")
+		var b := wuxia_unit(1, 1, Vector2i(3, 2))
+		var s := state_with(BattleMap.flat(8, 8), [a, b])
+		s.begin_next_turn()
+		a.qi = 8
+		b.rp = 0
+		s.execute(a, sid, b.pos)
+		check(a.tongmai_pending and a.tongmai_triggered, sid + " control hit schedules Tongmai")
+		a.ap = 20
+		a.qi = 10
+		b.pos = Vector2i(3, 2)
+		s.execute(a, "截脉指", b.pos)
+		a.qi = 0
+		s.end_turn()
+		s.begin_next_turn()
+		eq(a.qi, 0, "no early recovery during another actor's action")
+		s.end_turn()
+		s.begin_next_turn()
+		eq(a.qi, 2, "next own action recovers base one plus exactly one trait qi")
+		eq(a.ap, 6, "Tongmai does not grant AP")
+		check(not a.tongmai_pending and not a.tongmai_triggered, "pending recovery consumed and trigger resets")
+		s.end_turn()
+		s.begin_next_turn()
+		s.end_turn()
+		s.begin_next_turn()
+		eq(a.qi, 3, "later action has only normal recovery")
+	var a := wuxia_unit(0, 0, Vector2i(2, 2))
+	a.innate_trait = "通脉"
+	a.inner = "归元诀"
+	var b := wuxia_unit(1, 1, Vector2i(3, 2))
+	var s := state_with(BattleMap.flat(8, 8), [a, b])
+	s.begin_next_turn()
+	b.rp = 0
+	s.execute(a, "普攻", b.pos)
+	check(not a.tongmai_pending, "ordinary hit does not activate Tongmai")
+	a.ap = 20
+	force_next_wuxia_miss(s)
+	s.execute(a, "截脉指", b.pos)
+	check(not a.tongmai_pending, "missed control does not activate Tongmai")
+	s.always_hit = true
+	s.execute(a, "截脉指", b.pos)
+	check(a.tongmai_pending, "later successful control can trigger after miss")
+	a.qi = a.max_qi
+	s.end_turn()
+	s.begin_next_turn()
+	s.end_turn()
+	s.begin_next_turn()
+	eq(a.qi, a.max_qi, "Tongmai and inner recovery respect qi cap")
+	check(not a.tongmai_pending, "capped recovery still consumes pending trigger")
+
+
+func _control_has_text(node: Node, needle: String) -> bool:
+	if (node is Label or node is Button) and node.text.contains(needle):
+		return true
+	for child in node.get_children():
+		if _control_has_text(child, needle):
+			return true
+	return false
+
+
+func _find_party_button(node: Node, caption: String) -> Button:
+	if node is Button and node.text == caption:
+		return node
+	for child in node.get_children():
+		var result := _find_party_button(child, caption)
+		if result != null:
+			return result
+	return null
+
+
+func test_party_preparation_ui() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	game.chapter = ChapterState.new()
+	game.shot = "inn"
+	game.chapter.scene_id = "inn"
+	game.chapter.apply_event("quest_start")
+	game.chapter.apply_event("b1_clear", {"result": "win"})
+	var scene = load("res://scenes/explore.tscn").instantiate()
+	root.add_child(scene)
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["codex"]) + Vector2(0, 42)
+	scene.interact("codex")
+	var panel: Control = scene.party_panel
+	check(panel.visible and panel.selected_character == "", "P opens shared library before character details")
+	await process_frame
+	eq(panel.size, scene.ui.size, "preparation overlay fills its parent")
+	check(panel.get_child(1).size.y > 500, "preparation content has usable vertical space")
+	check(not scene.minimap.visible, "minimap cannot cover preparation controls")
+	for category in ["招式", "内功", "轻功", "AP", "内力", "范围", "定位"]:
+		check(_control_has_text(panel, category), "library shows " + category)
+	panel._select_character("sword")
+	check(_control_has_text(panel, "未习得"), "collected reward is visibly unlearned")
+	check(not panel.learn_button.disabled, "free learning available")
+	panel.learn_button.pressed.emit()
+	await process_frame
+	check(game.chapter.party.characters["sword"]["learned"].has("回锋剑"), "learn button mutates personal learned arts")
+	check(panel.learn_button.disabled, "repeat learning disabled")
+	panel.equip_buttons[2].pressed.emit()
+	await process_frame
+	eq(game.chapter.party.characters["sword"]["active"][2], "回锋剑", "equip button writes selected slot")
+	panel._select_character("spear")
+	check(_control_has_text(panel, "兵器不兼容"), "wrong-weapon art visibly marked")
+	check(not panel.learn_button.disabled, "wrong weapon still permits learning")
+	panel.learn_button.pressed.emit()
+	await process_frame
+	for button in panel.equip_buttons:
+		check(button.disabled, "wrong-weapon equip buttons disabled")
+	panel.close()
+	scene._show_pause()
+	check(panel.visible and panel.mode == "party", "Esc opens growth interface")
+	for stat in ["气血", "劲力", "护体", "眼力", "身法", "速度", "内力", "EXP", "训练点"]:
+		check(_control_has_text(panel, stat), "party UI displays " + stat)
+	var allocate := _find_party_button(panel, "＋ 分配")
+	check(allocate != null and not allocate.disabled, "earned training point can be allocated in UI")
+	allocate.pressed.emit()
+	await process_frame
+	eq(game.chapter.party.characters["sword"]["training"].get("强身", 0), 1, "training button allocates point")
+	var reset := _find_party_button(panel, "免费重置训练点")
+	reset.pressed.emit()
+	await process_frame
+	eq(game.chapter.party.training_points("sword"), 1, "reset UI restores point")
+	check(scene.player.blocked, "preparation blocks exploration movement")
+	panel.close()
+	check(not scene.player.blocked, "closing preparation restores movement")
+	check(scene.minimap.visible, "closing preparation restores minimap")
+	scene.free()
+	game.chapter = old_chapter
+	game.shot = old_shot
+
+
+func test_party_exploration_loadout() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	var old_origin: Dictionary = game.exploration_battle.duplicate(true)
+	game.chapter = ChapterState.new()
+	game.shot = "inn"
+	game.current_battle = "wuxia_b1"
+	var p: PartyState = game.chapter.party
+	p.gain_exp("sword", 240)
+	p.train("sword", "强身")
+	p.train("sword", "迅捷")
+	p.equip("sword", "", 0)
+	p.equip("sword", "", 0, "轻功")
+	game.exploration_battle = {"battle_id": "wuxia_b1"}
+	var battle = load("res://scenes/battle.tscn").instantiate()
+	root.add_child(battle)
+	var u: BattleUnit = battle.state.units[0]
+	eq([u.level, u.max_hp, u.hp, u.spd], [3, 41, 41, 91], "exploration B1 applies level HP and training")
+	check(not u.skills.has("破风剑") and u.lightfoot == "", "exploration B1 uses prepared equipment")
+	eq([u.max_ap, u.ap, u.rp], [6, 6, 1], "progression preserves AP and RP")
+	for i in 3:
+		eq(battle.state.units[i].innate_trait, PartyState.TRAITS[PartyState.IDS[i]], "B1 character has its fixed trait")
+	eq(battle.state.units[3].max_hp, 25, "enemy data remains unchanged")
+	battle.free()
+	game.exploration_battle.clear()
+	battle = load("res://scenes/battle.tscn").instantiate()
+	root.add_child(battle)
+	u = battle.state.units[0]
+	eq([u.level, u.max_hp, u.spd], [1, 31, 88], "direct-title demo keeps default B1 values")
+	check(u.skills.has("破风剑") and u.lightfoot == "燕行步", "direct demo keeps default equipment")
+	battle.free()
+	game.chapter = old_chapter
+	game.shot = old_shot
+	game.current_battle = old_battle
+	game.exploration_battle = old_origin

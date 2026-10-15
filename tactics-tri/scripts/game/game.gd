@@ -107,7 +107,7 @@ func start_exploration() -> void:
 
 func save_chapter() -> bool:
 	# Screenshot fixtures never overwrite the player's real save.
-	if shot in ["explore", "inn"]:
+	if shot in ["explore", "inn", "library", "party"]:
 		return true
 	return chapter.save_to_file() == OK
 
@@ -129,7 +129,7 @@ func begin_ferry_battle(entry_position: Vector2) -> bool:
 	chapter.player_position = ExplorationRules.valid_spawn("outdoor", entry_position)
 	if not save_chapter():
 		return false
-	exploration_battle = {"battle_id": "wuxia_b1", "snapshot": chapter.to_dict()}
+	exploration_battle = {"battle_id": "wuxia_b1", "snapshot": chapter.to_dict(), "deployed": PartyState.IDS.duplicate()}
 	current_battle = "wuxia_b1"
 	_change("battle")
 	return true
@@ -146,7 +146,7 @@ func finish_exploration_battle(result: String) -> bool:
 	var before := chapter.to_dict()
 	chapter = ChapterState.from_dict(exploration_battle["snapshot"])
 	if result == "win":
-		if not chapter.apply_event("b1_clear", {"result": "win"}):
+		if not chapter.apply_event("b1_clear", {"result": "win", "deployed": exploration_battle.get("deployed", PartyState.IDS)}):
 			chapter = ChapterState.from_dict(before)
 			return false
 		chapter.player_position = ExplorationRules.center(Vector2i(37, 22))
@@ -296,11 +296,17 @@ func _parse_args() -> void:
 
 func _do_shot() -> void:
 	match shot:
-		"explore", "inn":
+		"explore", "inn", "library", "party":
 			chapter = ChapterState.new()
 			chapter_loaded = true
-			chapter.scene_id = "inn" if shot == "inn" else "outdoor"
-			chapter.player_position = ExplorationRules.center(Vector2i(6, 8) if shot == "inn" else Vector2i(8, 23))
+			chapter.scene_id = "outdoor" if shot == "explore" else "inn"
+			chapter.player_position = ExplorationRules.center(Vector2i(8, 23) if shot == "explore" else Vector2i(6, 8))
+			if shot in ["library", "party"]:
+				chapter.apply_event("quest_start")
+				chapter.apply_event("b1_clear", {"result": "win"})
+				if shot == "party":
+					chapter.party.gain_exp("sword", 370)
+					chapter.party.train("sword", "凝神")
 			_change("explore")
 		"title":
 			_change("title")

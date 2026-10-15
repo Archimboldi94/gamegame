@@ -102,7 +102,7 @@ const KEY_PAN_DELAY_MS := 180
 
 func _ready() -> void:
 	def = BattleDefs.get_def(Game.current_battle)
-	state = BattleDefs.build_state(Game.current_battle, 7 if Game.shot != "" or Game.autoplay != "" else randi())
+	state = BattleDefs.build_state(Game.current_battle, 7 if Game.shot != "" or Game.autoplay != "" else randi(), Game.chapter.party if Game.is_exploration_battle() else null)
 	view = IsoView.new()
 	view.configure(state.map.width, state.map.height)
 	_build_world()
