@@ -38,10 +38,21 @@ func _run_all() -> void:
 		"test_wuxia_lightfoot_opportunities", "test_wuxia_retreat_once_and_reactions",
 		"test_wuxia_movement_cost_and_action_combos", "test_wuxia_ai_resource_and_active_skills",
 		"test_wuxia_hud_skill_availability",
+		"test_chapter_event_conditions_and_rewards", "test_chapter_stance_once_and_failure",
+		"test_chapter_save_round_trip", "test_exploration_movement_and_radius",
+		"test_exploration_outdoor_reachability", "test_exploration_scene_interactions",
+		"test_exploration_doors_and_collision",
+		"test_exploration_battle_return_flow",
 	]
 	for t in tests:
 		_current = t
-		call(t)
+		await call(t)
+	# Let the audio thread release stopped playback before headless shutdown.
+	for node in root.get_node("AudioManager").get_children():
+		if node is AudioStreamPlayer:
+			node.stop()
+			node.stream = null
+	await create_timer(0.1).timeout
 	print("")
 	print("==== RESULT: %d PASS, %d FAIL ====" % [passed, failed])
 	quit(1 if failed > 0 else 0)
@@ -973,6 +984,345 @@ func test_battle_hud_and_ground_toggle() -> void:
 	wuxia.free()
 	game.shot = old_shot
 	game.current_battle = old_battle
+
+
+func test_chapter_event_conditions_and_rewards() -> void:
+	var s := ChapterState.new()
+	eq(s.quest_state, ChapterState.QuestState.S0_ARRIVED, "starts arrived")
+	var initial := s.to_dict()
+	for event in ["ferry_battle_start", "reversal_lesson", "choose_escort", "choose_sect"]:
+		check(not s.apply_event(event), "reject early " + event)
+		eq(s.to_dict(), initial, "early rejection changes nothing")
+	check(not s.apply_event("b1_clear", {"result": "win"}), "cannot submit B1 before quest")
+	check(s.apply_event("quest_start"), "accept quest")
+	eq(s.quest_state, ChapterState.QuestState.S1_TO_FERRY, "quest points to ferry")
+	check(not s.apply_event("quest_start"), "quest once")
+	var entry := s.to_dict()
+	check(s.apply_event("ferry_battle_start"), "B1 entry available")
+	eq(s.to_dict(), entry, "entry grants no rewards or flags")
+	check(not s.apply_event("b1_clear"), "B1 requires a victory result")
+	check(s.apply_event("b1_clear", {"result": "win"}), "submit B1 victory")
+	eq(s.quest_state, ChapterState.QuestState.S2_AFTER_B1, "after-B1 objective")
+	eq(s.experience, 100, "B1 exp exactly 100")
+	eq(s.unlocked_manuals, ["回锋剑谱"], "B1 shared codex unlock")
+	var rewarded := s.to_dict()
+	check(not s.apply_event("b1_clear", {"result": "win"}), "victory cannot repeat")
+	check(not s.apply_event("ferry_battle_start"), "completed ferry cannot restart")
+	eq(s.to_dict(), rewarded, "revisit grants nothing")
+	check(s.apply_event("reversal_lesson"), "receive lesson after B1")
+	check(not s.apply_event("reversal_lesson"), "lesson cannot repeat")
+	eq(s.insights, 1, "one insight only")
+	check(s.apply_event("choose_escort"), "choose route")
+	eq(s.quest_state, ChapterState.QuestState.S3_ROUTE_SET, "route objective")
+	check(s.can_event("shrine_battle_start"), "shrine does not require B2")
+	check(s.can_event("bamboo_battle_start"), "optional bamboo available")
+	check(not s.complete, "minimum slice never falsely completes chapter")
+	s.b3_clear = true
+	s.ledger_received = true
+	eq(s.quest_state, ChapterState.QuestState.S4_FINAL, "future B3 + ledger state")
+	s.complete = true
+	eq(s.quest_state, ChapterState.QuestState.S5_COMPLETE, "future completed state")
+
+
+func test_chapter_stance_once_and_failure() -> void:
+	for first in ["choose_escort", "choose_sect"]:
+		var s := ChapterState.new()
+		s.apply_event("quest_start")
+		var before := s.to_dict()
+		for result in ["lose", "timeout", "abandon", ""]:
+			check(not s.apply_event("b1_clear", {"result": result}), "non-win rejected " + result)
+			eq(s.to_dict(), before, "failure leaves all flags/rewards/position unchanged")
+		s.apply_event("b1_clear", {"result": "win"})
+		check(s.apply_event(first), "first stance permitted")
+		var chosen := s.to_dict()
+		for repeat in ["choose_escort", "choose_sect"]:
+			check(not s.apply_event(repeat), "neither same nor other stance can repeat")
+			eq(s.to_dict(), chosen, "repeat stance changes no relations")
+		eq(s.escort_relation + s.sect_relation, 1, "one faction point total")
+		eq(s.stance, "escort" if first == "choose_escort" else "sect", "chosen stance preserved")
+		check(s.apply_event("reversal_lesson"), "lesson still available after either stance")
+
+
+func test_chapter_save_round_trip() -> void:
+	var path := "user://ch01_test_round_trip.json"
+	var s := ChapterState.new()
+	s.apply_event("quest_start")
+	s.apply_event("b1_clear", {"result": "win"})
+	s.apply_event("choose_sect")
+	s.apply_event("reversal_lesson")
+	s.scene_id = "inn"
+	s.player_position = Vector2(300.25, 366.75)
+	s.outdoor_return = Vector2(408, 1080)
+	s.facing = "NE"
+	s.visited_areas.assign(["outdoor", "inn"])
+	eq(s.save_to_file(path), OK, "save atomically")
+	var loaded := ChapterState.load_from_file(path)
+	check(loaded != null, "load succeeds")
+	if loaded != null:
+		eq(loaded.to_dict(), s.to_dict(), "disk round trip preserves flags/rewards/world position")
+		for event in ["quest_start", "reversal_lesson", "choose_escort", "choose_sect"]:
+			check(not loaded.apply_event(event), "load cannot duplicate " + event)
+		check(not loaded.apply_event("b1_clear", {"result": "win"}), "loaded B1 reward once")
+		eq(loaded.to_dict(), s.to_dict(), "loaded progress immutable on replay")
+	# Replacing an existing file is also supported.
+	eq(s.save_to_file(path), OK, "overwrite complete save atomically")
+	var bad := s.to_dict()
+	bad["stance"] = "both"
+	check(ChapterState.from_dict(bad) == null, "invalid stance rejected")
+	bad = s.to_dict()
+	bad["b1_clear"] = false
+	check(ChapterState.from_dict(bad) == null, "inconsistent progress rejected")
+	check(ChapterState.from_dict({}) == null, "missing/corrupt save rejected")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var fallback := ExplorationRules.center(ExplorationRules.OUTDOOR_POINTS["explore_spawn"])
+	eq(ExplorationRules.valid_spawn("outdoor", Vector2(-100, -100)), fallback, "out of bounds load falls back safely")
+	eq(ExplorationRules.valid_spawn("outdoor", ExplorationRules.center(Vector2i(46, 27))), fallback, "water load falls back safely")
+	eq(ExplorationRules.valid_spawn("inn", ExplorationRules.center(ExplorationRules.INN_POINTS["keeper"])), ExplorationRules.center(ExplorationRules.INN_POINTS["inn_spawn"]), "NPC-overlap load falls back safely")
+
+
+func test_exploration_movement_and_radius() -> void:
+	eq(ExplorationRules.movement_velocity(Vector2.ZERO), Vector2.ZERO, "no input no movement")
+	for direction in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1), Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
+		check(is_equal_approx(ExplorationRules.movement_velocity(direction).length(), ExplorationRules.SPEED), "all eight directions have same speed " + str(direction))
+	var p := Vector2(400.5, 700.25)
+	check(ExplorationRules.in_interaction_radius(p, p), "interaction at center")
+	check(ExplorationRules.in_interaction_radius(p, p + Vector2(70, 0)), "interaction boundary included")
+	check(not ExplorationRules.in_interaction_radius(p, p + Vector2(70.1, 0)), "outside radius excluded")
+	check(not ExplorationRules.in_interaction_radius(p, p + Vector2(50, 50)), "radius is circular")
+
+
+func _exploration_reachable(rows: Array[String], start: Vector2i) -> Dictionary:
+	var reached := {start: true}
+	var queue: Array[Vector2i] = [start]
+	var index := 0
+	# Four-neighbor BFS is stricter than continuous diagonal walking, so corner cuts cannot help.
+	while index < queue.size():
+		var point := queue[index]
+		index += 1
+		for direction in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next: Vector2i = point + direction
+			if not reached.has(next) and not ExplorationRules.is_blocked(rows, next):
+				reached[next] = true
+				queue.append(next)
+	return reached
+
+
+func test_exploration_outdoor_reachability() -> void:
+	var rows := ExplorationRules.grid("outdoor")
+	eq(rows.size(), 30, "outdoor 30 high")
+	for row in rows:
+		eq(row.length(), 48, "outdoor 48 wide")
+	var reached := _exploration_reachable(rows, ExplorationRules.OUTDOOR_POINTS["explore_spawn"])
+	for key in ["inn_door", "ferry_event", "bamboo_event", "shrine_event"]:
+		var cell: Vector2i = ExplorationRules.OUTDOOR_POINTS[key]
+		check(reached.has(cell), "spawn to " + key + " uses no wall/water")
+		check(ExplorationRules.safe_position(rows, ExplorationRules.center(cell)), "player clearance at " + key)
+	check(ExplorationRules.is_blocked(rows, Vector2i(46, 27)), "river solid")
+	check(ExplorationRules.is_blocked(rows, Vector2i(5, 19)), "inn wall solid")
+	check(ExplorationRules.is_blocked(rows, Vector2i(22, 5)), "forest solid")
+	check(not ExplorationRules.is_blocked(rows, Vector2i(41, 23)), "wooden bridge passable")
+	var inn := ExplorationRules.grid("inn")
+	eq(inn.size(), 10, "inn 10 high")
+	eq(inn[0].length(), 14, "inn 14 wide")
+	var indoor_reached := _exploration_reachable(inn, ExplorationRules.INN_POINTS["inn_spawn"])
+	for cell in ExplorationRules.INN_POINTS.values():
+		check(indoor_reached.has(cell), "inn target accessible " + str(cell))
+
+
+func test_exploration_scene_interactions() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	# These scene tests use screenshot isolation, never the player's save.
+	game.shot = "inn"
+	game.chapter = ChapterState.new()
+	game.chapter.scene_id = "inn"
+	game.chapter.player_position = ExplorationRules.center(ExplorationRules.INN_POINTS["inn_spawn"])
+	var scene = load("res://scenes/explore.tscn").instantiate()
+	root.add_child(scene)
+	check(not scene.interact("keeper"), "scene rejects remote interaction")
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["keeper"]) + Vector2(0, 42)
+	check(scene.interact("keeper"), "near keeper opens dialogue")
+	check(not game.chapter.quest_accepted, "opening dialogue never accepts quest")
+	scene._close_dialogue()
+	check(not game.chapter.quest_accepted, "cancel confirmation preserves flags")
+	scene.interact("keeper")
+	scene.modal_action.call()
+	check(game.chapter.quest_accepted, "confirmed keeper accepts quest")
+	game.chapter.apply_event("b1_clear", {"result": "win"})
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["meng"]) + Vector2(0, 42)
+	scene._close_dialogue()
+	scene.interact("meng")
+	check(game.chapter.stance == "", "stance needs confirmation")
+	scene.modal_action.call()
+	eq(game.chapter.stance, "escort", "M confirmation selects escort")
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["luo"]) + Vector2(0, 42)
+	scene.interact("luo")
+	check(not scene.modal_action.is_valid(), "N cannot change existing stance")
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["training"]) + Vector2(0, 42)
+	scene.interact("training")
+	scene.modal_action.call()
+	scene.interact("training")
+	eq(game.chapter.insights, 1, "scene lesson awarded once")
+	check(not scene.modal_action.is_valid(), "scene repeat lesson has no reward action")
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["codex"]) + Vector2(0, 42)
+	scene.interact("codex")
+	check(scene.modal_title.text.contains("队伍已收录"), "codex first shows shared collection")
+	check(scene.modal_text.text.contains("回锋剑谱"), "collected sword manual visible")
+	scene.free()
+	game.chapter = old_chapter
+	game.shot = old_shot
+
+
+func test_exploration_doors_and_collision() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	game.shot = "explore"
+	game.chapter = ChapterState.new()
+	var door_entry := ExplorationRules.center(ExplorationRules.OUTDOOR_POINTS["inn_door"]) + Vector2(0, 42)
+	game.chapter.player_position = door_entry
+	var scene = load("res://scenes/explore.tscn").instantiate()
+	root.add_child(scene)
+	current_scene = scene
+	check(scene.interact("inn_door"), "walk to door to enter inn")
+	await scene_changed
+	scene = current_scene
+	eq(game.chapter.scene_id, "inn", "door loads inn")
+	eq(scene.player.position, ExplorationRules.center(ExplorationRules.INN_POINTS["inn_spawn"]), "inn safe spawn")
+	eq(game.chapter.outdoor_return, door_entry, "outdoor return position remembered")
+	# Real physics: movement is fractional world motion and solid NPC feet stop it.
+	Input.action_press("explore_up")
+	var start: Vector2 = scene.player.position
+	for i in 3:
+		await physics_frame
+	check(scene.player.position.y < start.y and scene.player.position.y > start.y - ExplorationRules.TILE, "continuous partial-tile movement")
+	Input.action_release("explore_up")
+	scene.player.position = ExplorationRules.center(Vector2i(6, 4))
+	Input.action_press("explore_up")
+	for i in 18:
+		await physics_frame
+	Input.action_release("explore_up")
+	check(scene.player.position.y >= 168 + 24 - 0.1, "keeper collision prevents body overlap")
+	scene.player.position = Vector2(60, 250)
+	Input.action_press("explore_left")
+	for i in 10:
+		await physics_frame
+	Input.action_release("explore_left")
+	check(scene.player.position.x >= 58 - 0.1, "physical inn wall stops movement")
+	scene._show_journal()
+	var paused: Vector2 = scene.player.position
+	Input.action_press("explore_right")
+	for i in 3:
+		await physics_frame
+	Input.action_release("explore_right")
+	eq(scene.player.position, paused, "dialogue/log pauses movement")
+	scene._close_dialogue()
+	scene.player.position = ExplorationRules.center(ExplorationRules.INN_POINTS["exit"]) - Vector2(0, 36)
+	check(scene.interact("exit"), "walk to exit to return outdoors")
+	await scene_changed
+	scene = current_scene
+	eq(game.chapter.scene_id, "outdoor", "exit loads outdoor")
+	eq(scene.player.position, door_entry, "door restores saved world position")
+	var river_edge := 42 * ExplorationRules.TILE
+	scene.player.position = Vector2(river_edge - 12, 1320)
+	Input.action_press("explore_right")
+	for i in 18:
+		await physics_frame
+	Input.action_release("explore_right")
+	check(scene.player.position.x <= river_edge - ExplorationRules.BODY_RADIUS + 0.1, "physical river collision stops movement")
+	var half_view: Vector2 = scene.get_viewport_rect().size / scene.camera.zoom / 2
+	var map_size := Vector2(48, 30) * ExplorationRules.TILE
+	check(scene.camera.position.x >= half_view.x and scene.camera.position.x <= map_size.x - half_view.x, "camera constrained horizontally")
+	if map_size.y >= half_view.y * 2:
+		check(scene.camera.position.y >= half_view.y and scene.camera.position.y <= map_size.y - half_view.y, "camera constrained vertically")
+	else:
+		eq(scene.camera.position.y, map_size.y / 2, "camera centers maps smaller than viewport")
+	scene.player.position = ExplorationRules.center(ExplorationRules.OUTDOOR_POINTS["bamboo_event"]) + Vector2(0, 38)
+	scene.interact("bamboo_event")
+	check(scene.modal_title.text.contains("线索不足"), "bamboo reachable before quest unlock")
+	game.chapter.apply_event("quest_start")
+	game.chapter.apply_event("b1_clear", {"result": "win"})
+	game.chapter.apply_event("choose_sect")
+	scene.interact("bamboo_event")
+	check(scene.modal_text.text.contains("后续开放"), "eligible bamboo shows later opening")
+	scene.player.position = ExplorationRules.center(ExplorationRules.OUTDOOR_POINTS["shrine_event"]) + Vector2(0, 38)
+	scene.interact("shrine_event")
+	check(scene.modal_text.text.contains("无需先去竹林"), "shrine never requires B2")
+	check(game.chapter.visited_areas.has("inn") and game.chapter.visited_areas.has("outdoor"), "area first-visit names recorded")
+	scene.queue_free()
+	current_scene = null
+	await process_frame
+	game.chapter = old_chapter
+	game.shot = old_shot
+
+
+func test_exploration_battle_return_flow() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	var old_step: int = game.step
+	var old_loaded: bool = game.chapter_loaded
+	game.shot = "explore"
+	game.step = 4
+	for result in ["lose", "win"]:
+		game.chapter = ChapterState.new()
+		game.chapter.apply_event("quest_start")
+		game.chapter.player_position = ExplorationRules.center(Vector2i(37, 23)) + Vector2(-16, -14)
+		game.chapter.visited_areas.assign(["outdoor"])
+		game.chapter.facing = "SW"
+		var entry: Dictionary = game.chapter.to_dict()
+		check(game.begin_ferry_battle(game.chapter.player_position), "exploration enters real B1")
+		check(game.is_exploration_battle(), "battle origin recorded")
+		eq(game.chapter.to_dict(), entry, "entry does not change chapter progress")
+		await scene_changed
+		var battle = current_scene
+		eq(battle.get_script().resource_path, "res://scripts/game/battle.gd", "existing battle scene loaded")
+		eq(game.current_battle, "wuxia_b1", "correct wuxia battle")
+		if is_instance_valid(battle.overlay):
+			battle.overlay.queue_free()
+			battle.overlay = null
+		battle._finish(result)
+		eq(game.chapter.to_dict(), entry, "result display does not grant early rewards")
+		battle.overlay_confirm.call()
+		await scene_changed
+		var explore = current_scene
+		eq(explore.get_script().resource_path, "res://scripts/game/explore.gd", "result returns to exploration scene")
+		eq(game.step, 4, "exploration return leaves story FLOW unchanged")
+		check(not game.is_exploration_battle(), "battle origin consumed once")
+		if result == "lose":
+			eq(game.chapter.to_dict(), entry, "defeat restores entire entry snapshot")
+			eq(explore.player.position, Vector2(entry["player_position"][0], entry["player_position"][1]), "defeat returns to exact entry world position")
+		else:
+			check(game.chapter.b1_clear, "scene victory submits B1 flag")
+			eq(game.chapter.experience, 100, "scene victory records 100 exp")
+			eq(game.chapter.unlocked_manuals, ["回锋剑谱"], "scene victory records shared manual")
+			eq(explore.player.position, ExplorationRules.center(Vector2i(37, 22)), "victory returns to GDD safe position")
+			check(not game.begin_ferry_battle(explore.player.position), "completed B1 cannot reopen")
+		var once: Dictionary = game.chapter.to_dict()
+		check(not game.finish_exploration_battle("win"), "double result callback rejected")
+		eq(game.chapter.to_dict(), once, "double callback grants no extra rewards")
+		explore.queue_free()
+		current_scene = null
+		await process_frame
+	# Classic and directly launched battle results retain the original story callback.
+	game.current_battle = "b1"
+	var classic = load("res://scenes/battle.tscn").instantiate()
+	root.add_child(classic)
+	if is_instance_valid(classic.overlay):
+		classic.overlay.queue_free()
+		classic.overlay = null
+	classic._finish("win")
+	eq(classic.overlay_confirm, Callable(game, "advance"), "classic win still advances story")
+	classic.free()
+	game.chapter = old_chapter
+	game.shot = old_shot
+	game.current_battle = old_battle
+	game.step = old_step
+	game.chapter_loaded = old_loaded
+	game.explore_notice = ""
+	await process_frame
 
 
 func test_audio_placeholders_and_manager() -> void:

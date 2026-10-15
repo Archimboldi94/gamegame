@@ -664,6 +664,12 @@ func _finish(result: String) -> void:
 		Engine.time_scale = 1.0
 		get_tree().quit(0 if result == "win" or result == "lose" else 1)
 		return
+	if Game.is_exploration_battle():
+		overlay = _overlay_panel([
+			["胜  利" if result == "win" else "暂  退", 96, UIKit.GOLD],
+			["封箱已夺回。回到渡口后收录剑谱，记录经验100。" if result == "win" else "返回战前入口，保留原有章节进度。", 34, UIKit.IVORY],
+		], [["返回青崖渡", _return_to_exploration.bind(result)]])
+		return
 	if result == "win":
 		overlay = _overlay_panel([
 			["胜  利", 96, Color(1, 0.88, 0.5)],
@@ -674,6 +680,16 @@ func _finish(result: String) -> void:
 			["败  北", 96, Color(1, 0.5, 0.45)],
 			["林砚倒下了……天平不会为倒下的人倾斜。", 34, Color(0.95, 0.85, 0.85)],
 		], [["重新挑战", Game.retry_battle], ["返回标题", Game.goto_title]])
+
+
+func _return_to_exploration(result: String) -> void:
+	if not Game.finish_exploration_battle(result):
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+		overlay = _overlay_panel([
+			["存档未能写入", 64, UIKit.GOLD],
+			["章节进度保持原状，请重试返回。", 34, UIKit.IVORY],
+		], [["重试返回", _return_to_exploration.bind(result)]])
 
 
 func _overlay_panel(lines: Array, buttons: Array) -> Control:

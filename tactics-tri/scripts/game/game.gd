@@ -7,6 +7,7 @@ const SCENES := {
 	"battle": "res://scenes/battle.tscn",
 	"vote": "res://scenes/vote.tscn",
 	"ending": "res://scenes/ending.tscn",
+	"explore": "res://scenes/explore.tscn",
 }
 
 const FLOW := [
@@ -30,11 +31,16 @@ var shot := ""
 var shot_out := ""
 var shot_frames := 45
 var autoplay := ""  # --autoplay=<battle id>: AI plays both sides through the real battle scene, then quits
+var chapter := ChapterState.new()
+var chapter_loaded := false
+var exploration_battle: Dictionary = {}
+var explore_notice := ""
 
 
 func _ready() -> void:
 	theme = _build_theme()
 	get_tree().root.theme = theme
+	_configure_exploration_inputs()
 	_parse_args()
 	if shot != "":
 		_do_shot.call_deferred()
@@ -46,6 +52,7 @@ func _ready() -> void:
 # ------------------------------------------------------------------ flow
 
 func new_game() -> void:
+	exploration_battle.clear()
 	step = -1
 	leader_values = {"ren": 1, "zhi": 1, "yong": 1}
 	vote_result = ""
@@ -53,6 +60,7 @@ func new_game() -> void:
 
 
 func start_battle_demo() -> void:
+	exploration_battle.clear()
 	leader_values = {"ren": 1, "zhi": 1, "yong": 1}
 	current_battle = "wuxia_b1"
 	_change("battle")
@@ -83,7 +91,87 @@ func retry_battle() -> void:
 
 func goto_title() -> void:
 	step = -1
+	exploration_battle.clear()
 	_change("title")
+
+
+func start_exploration() -> void:
+	exploration_battle.clear()
+	if not chapter_loaded:
+		var saved := ChapterState.load_from_file()
+		chapter = saved if saved != null else ChapterState.new()
+		chapter_loaded = true
+	chapter.player_position = ExplorationRules.valid_spawn(chapter.scene_id, chapter.player_position)
+	_change("explore")
+
+
+func save_chapter() -> bool:
+	# Screenshot fixtures never overwrite the player's real save.
+	if shot in ["explore", "inn"]:
+		return true
+	return chapter.save_to_file() == OK
+
+
+func commit_chapter_event(event_id: String, context: Dictionary = {}) -> bool:
+	var before := chapter.to_dict()
+	if not chapter.apply_event(event_id, context):
+		return false
+	if not save_chapter():
+		chapter = ChapterState.from_dict(before)
+		return false
+	return true
+
+
+func begin_ferry_battle(entry_position: Vector2) -> bool:
+	if not chapter.can_event("ferry_battle_start") or not exploration_battle.is_empty():
+		return false
+	chapter.scene_id = "outdoor"
+	chapter.player_position = ExplorationRules.valid_spawn("outdoor", entry_position)
+	if not save_chapter():
+		return false
+	exploration_battle = {"battle_id": "wuxia_b1", "snapshot": chapter.to_dict()}
+	current_battle = "wuxia_b1"
+	_change("battle")
+	return true
+
+
+func is_exploration_battle() -> bool:
+	return not exploration_battle.is_empty() and current_battle == exploration_battle.get("battle_id", "")
+
+
+## Only the exploration-origin result button calls this. Story FLOW is untouched.
+func finish_exploration_battle(result: String) -> bool:
+	if not is_exploration_battle():
+		return false
+	var before := chapter.to_dict()
+	chapter = ChapterState.from_dict(exploration_battle["snapshot"])
+	if result == "win":
+		if not chapter.apply_event("b1_clear", {"result": "win"}):
+			chapter = ChapterState.from_dict(before)
+			return false
+		chapter.player_position = ExplorationRules.center(Vector2i(37, 22))
+	if not save_chapter():
+		chapter = ChapterState.from_dict(before)
+		return false
+	explore_notice = "首胜 · 队伍收录《回锋剑谱》 · 经验 +100\n可回听雨客栈查看谱库、领取演武心得。" if result == "win" else "已退回战前入口，可再次调查渡口。"
+	exploration_battle.clear()
+	_change("explore")
+	return true
+
+
+func _configure_exploration_inputs() -> void:
+	var bindings := {
+		"explore_left": [KEY_A, KEY_LEFT], "explore_right": [KEY_D, KEY_RIGHT],
+		"explore_up": [KEY_W, KEY_UP], "explore_down": [KEY_S, KEY_DOWN],
+		"explore_interact": [KEY_E, KEY_ENTER], "explore_journal": [KEY_TAB],
+	}
+	for action in bindings:
+		if not InputMap.has_action(action):
+			InputMap.add_action(action)
+			for key in bindings[action]:
+				var event := InputEventKey.new()
+				event.physical_keycode = key
+				InputMap.action_add_event(action, event)
 
 
 func add_conviction(virtue: String, amount := 2) -> void:
@@ -208,6 +296,12 @@ func _parse_args() -> void:
 
 func _do_shot() -> void:
 	match shot:
+		"explore", "inn":
+			chapter = ChapterState.new()
+			chapter_loaded = true
+			chapter.scene_id = "inn" if shot == "inn" else "outdoor"
+			chapter.player_position = ExplorationRules.center(Vector2i(6, 8) if shot == "inn" else Vector2i(8, 23))
+			_change("explore")
 		"title":
 			_change("title")
 		"dialogue":

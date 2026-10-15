@@ -43,6 +43,7 @@ func _ready() -> void:
 	col.add_child(buttons)
 	buttons.add_child(UIKit.button("开始游戏", Game.new_game, 360, 112))
 	buttons.add_child(UIKit.button("渡口截箱", Game.start_battle_demo, 360, 112))
+	buttons.add_child(UIKit.button("江湖·青崖渡", Game.start_exploration, 360, 112))
 	if OS.get_name() != "Web":
 		buttons.add_child(UIKit.button("退出", func(): get_tree().quit(), 240, 112))
 
