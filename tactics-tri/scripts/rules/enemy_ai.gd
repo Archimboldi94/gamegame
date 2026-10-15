@@ -26,6 +26,8 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 		var tile_bonus: float = state.map.get_h(tile) * 0.3 - threat_count(state, u, tile) * caution - risk * risk_weight
 		if state.map.effect_at(tile) == "fire":
 			tile_bonus -= 8.0
+		if u.use_gdd_rules and state.map.get_terrain(tile) == "trap" and not state.trap_spent(tile):
+			tile_bonus -= 7.0
 		for sid in u.all_actions():
 			var sk: Dictionary = u.skill(sid)
 			if sk["kind"] == "self" or sk["kind"] == "move" or not state.skill_usable(u, sid):
@@ -264,16 +266,27 @@ static func _nearest_dist(p: Vector2i, foes: Array, gdd := false) -> int:
 		best = mini(best, Pathing.chebyshev(p, f.pos) if gdd else Pathing.manhattan(p, f.pos))
 	return best
 
-## B2 pickup+evacuate: player AI takes the shared chest then walks to the exit.
+## B2 pickup+evacuate, and B3 ledger once the leader is down.
 static func _gdd_mission(state: BattleState, u: BattleUnit, reach: Dictionary, best: Dictionary) -> Dictionary:
-	if state.win_type != "pickup_evacuate" or u.team != BattleUnit.PLAYER:
+	if u.team != BattleUnit.PLAYER:
 		return best
+	if state.win_type == "leader_pickup":
+		if not state.leader_fallen():
+			return best
+		return _pickup_bias(state, u, reach, best, 46.0, false)
+	if state.win_type != "pickup_evacuate":
+		return best
+	return _pickup_bias(state, u, reach, best, 28.0, true)
+
+
+static func _pickup_bias(state: BattleState, u: BattleUnit, reach: Dictionary, best: Dictionary, take_score: float, need_exit: bool) -> Dictionary:
 	var score := float(best["score"])
 	var ends: Array = reach.get("ends", [u.pos])
 	var cost: Dictionary = reach.get("cost", {})
 	if not state.chest_taken():
 		var chest: Vector2i = state.mission_chest()
 		var pickup_ap := int(state.mission.get("pickup_ap", 2))
+		var saw_adjacent := false
 		# Already adjacent with enough leftover AP after standing still / moving here.
 		for tile in ends:
 			var spent := int(cost.get(tile, 0 if tile == u.pos else 999))
@@ -282,6 +295,7 @@ static func _gdd_mission(state: BattleState, u: BattleUnit, reach: Dictionary, b
 			var d: Vector2i = tile - chest
 			if maxi(absi(d.x), absi(d.y)) != 1:
 				continue
+			saw_adjacent = true
 			if u.ap - spent < pickup_ap:
 				# Move adjacent this turn; pick up next action.
 				var approach := 14.0 - float(spent) * 0.2
@@ -289,11 +303,23 @@ static func _gdd_mission(state: BattleState, u: BattleUnit, reach: Dictionary, b
 					best = {"score": approach, "move": tile, "skill": "", "target": Vector2i(-1, -1)}
 					score = approach
 				continue
-			var pick_score := 28.0 - float(spent) * 0.15
+			var pick_score := take_score - float(spent) * 0.15
 			if pick_score > score:
 				best = {"score": pick_score, "move": tile, "skill": "__take_chest__", "target": tile}
 				score = pick_score
-	else:
+		# A wiped field used to idle forever if the chest was more than one move away.
+		if not saw_adjacent and state.living(1 - u.team).is_empty():
+			var best_tile := u.pos
+			var best_d := absi(u.pos.x - chest.x) + absi(u.pos.y - chest.y)
+			for tile in ends:
+				var step := absi(tile.x - chest.x) + absi(tile.y - chest.y)
+				if step < best_d:
+					best_d = step
+					best_tile = tile
+			var chase := 24.0 - float(best_d) * 0.2
+			if best_tile != u.pos and chase > score:
+				best = {"score": chase, "move": best_tile, "skill": "", "target": Vector2i(-1, -1)}
+	elif need_exit:
 		var exit_tile: Vector2i = state.mission_exit()
 		if ends.has(exit_tile):
 			var spent := int(cost.get(exit_tile, 0 if exit_tile == u.pos else 999))

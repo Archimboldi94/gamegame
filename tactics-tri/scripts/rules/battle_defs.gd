@@ -139,7 +139,7 @@ static func get_def(id: String) -> Dictionary:
 	if id == "wuxia_b2":
 		return {"name": "青崖渡 · 竹林遗匣", "win": "pickup_evacuate", "win_text": "取匣后至少一人撤离", "lose_text": "我方全灭", "sky": Color(0.40, 0.58, 0.48)}
 	if id == "wuxia_b3":
-		return {"name": "青崖渡 · 废祠夺簿", "win": "all", "win_text": "击败首领并取回渡簿（脚手架）", "lose_text": "我方全灭", "sky": Color(0.48, 0.44, 0.40)}
+		return {"name": "青崖渡 · 废祠夺簿", "win": "leader_pickup", "win_text": "击败首领后取回渡簿", "lose_text": "我方全灭", "sky": Color(0.42, 0.40, 0.46)}
 	return DEFS[id]
 
 
@@ -164,18 +164,24 @@ static func build_wuxia_b2(seed := 7, party: PartyState = null) -> BattleState:
 	return build_wuxia("wuxia_b2", seed, party)
 
 
-static func build_wuxia_b3(seed := 7, party: PartyState = null) -> BattleState:
-	return build_wuxia("wuxia_b3", seed, party)
+static func build_wuxia_b3(seed := 7, party: PartyState = null, stance := "") -> BattleState:
+	return build_wuxia("wuxia_b3", seed, party, stance)
 
 
-static func build_wuxia(id: String, seed := 7, party: PartyState = null) -> BattleState:
+static func build_wuxia(id: String, seed := 7, party: PartyState = null, stance := "") -> BattleState:
 	var key := id.replace("wuxia_", "")
 	var map_path := "res://data/wuxia/%s_map.json" % key
 	var combat_path := "res://data/wuxia/%s_combat.json" % key
 	var map_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(map_path))
 	var combat_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(combat_path))
-	var map := BattleMap.from_char_grid(map_raw["terrain_grid"], map_raw.get("markers", {}))
-	var markers: Dictionary = map_raw.get("markers", {})
+	var markers: Dictionary = (map_raw.get("markers", {}) as Dictionary).duplicate(true)
+	var use_stance := ""
+	if id == "wuxia_b3":
+		use_stance = "sect" if stance == "sect" else "escort"
+		_apply_b3_variant(markers, use_stance)
+	var map := BattleMap.from_char_grid(map_raw["terrain_grid"], markers)
+	if id == "wuxia_b3":
+		_apply_b3_terrain(map, use_stance)
 	var units: Array = []
 	for definition in combat_raw["units"]:
 		var u := BattleUnit.new()
@@ -226,7 +232,11 @@ static func build_wuxia(id: String, seed := 7, party: PartyState = null) -> Batt
 				party.apply_to_unit(u)
 		units.append(u)
 	var s := BattleState.new()
-	var win := "pickup_evacuate" if id == "wuxia_b2" else "all"
+	var win := "all"
+	if id == "wuxia_b2":
+		win = "pickup_evacuate"
+	elif id == "wuxia_b3":
+		win = "leader_pickup"
 	s.setup(map, units, win, seed)
 	if id == "wuxia_b2":
 		var q: Array = markers["Q"][0]
@@ -237,16 +247,42 @@ static func build_wuxia(id: String, seed := 7, party: PartyState = null) -> Batt
 			"taken": false,
 			"pickup_ap": 2,
 		}
+	elif id == "wuxia_b3":
+		var ledger: Array = markers["L"][0]
+		s.mission = {
+			"chest": Vector2i(int(ledger[0]), int(ledger[1])),
+			"taken": false,
+			"pickup_ap": 2,
+			"trap_damage": 8,
+			"spent_traps": [],
+			"stance": use_stance,
+		}
 	return s
 
 
-static func build_state(id: String, seed := 7, party: PartyState = null) -> BattleState:
+## GDD 15.3. Default and escort share the west deploy; sect shifts three tiles east and clears the trap.
+static func _apply_b3_variant(markers: Dictionary, stance: String) -> void:
+	if stance != "sect":
+		return
+	markers["A"] = [[7, 11]]
+	markers["B"] = [[8, 11]]
+	markers["D"] = [[9, 11]]
+
+
+static func _apply_b3_terrain(map: BattleMap, stance: String) -> void:
+	if stance == "sect":
+		map.set_terrain(Vector2i(6, 9), "grass")
+	else:
+		map.set_terrain(Vector2i(4, 9), "cart")
+
+
+static func build_state(id: String, seed := 7, party: PartyState = null, stance := "") -> BattleState:
 	if id == "wuxia_b1":
 		return build_wuxia_b1(seed, party)
 	if id == "wuxia_b2":
 		return build_wuxia_b2(seed, party)
 	if id == "wuxia_b3":
-		return build_wuxia_b3(seed, party)
+		return build_wuxia_b3(seed, party, stance)
 	var d: Dictionary = DEFS[id]
 	var units := []
 	var next_id := 0

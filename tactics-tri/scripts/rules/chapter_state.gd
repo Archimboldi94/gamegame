@@ -71,6 +71,8 @@ func can_event(event_id: String, context: Dictionary = {}) -> bool:
 			return b1_clear and stance != "" and not b2_clear and context.get("result", "") == "win"
 		"shrine_battle_start":
 			return b1_clear and stance != "" and not b3_clear
+		"b3_clear":
+			return b1_clear and stance != "" and not b3_clear and context.get("result", "") == "win"
 	return false
 
 
@@ -104,6 +106,14 @@ func apply_event(event_id: String, context: Dictionary = {}) -> bool:
 			experience += 80
 			party.collect("截脉指")
 			party.award_battle_exp(80, context.get("deployed", PartyState.IDS))
+		"b3_clear":
+			b3_clear = true
+			ledger_received = true
+			if not unlocked_manuals.has("渡簿"):
+				unlocked_manuals.append("渡簿")
+			experience += 140
+			party.award_battle_exp(140, context.get("deployed", PartyState.IDS))
+			complete = true
 	# Battle-start events deliberately grant and change nothing.
 	return true
 
@@ -166,6 +176,12 @@ static func from_dict(data: Dictionary) -> ChapterState:
 		return null
 	if s.b2_clear and data["version"] == 2 and not s.party.library.has("截脉指"):
 		return null
+	if s.b3_clear:
+		if s.stance == "" or not s.ledger_received or not s.unlocked_manuals.has("渡簿"):
+			return null
+		var min_exp := 320 if s.b2_clear else 240
+		if s.experience < min_exp:
+			return null
 	if s.complete and not (s.b3_clear and s.ledger_received):
 		return null
 	if data["version"] == 2:

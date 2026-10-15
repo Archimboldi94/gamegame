@@ -17,6 +17,9 @@ const DATA := {
 	"crate": {"name": "木箱", "cost": 99, "eva": 0, "pass": false, "art": "bridge", "leap_over": true},
 	"low_wall": {"name": "矮墙", "cost": 99, "eva": 0, "pass": false, "art": "stone", "leap_over": true},
 	"gap": {"name": "沟壑", "cost": 99, "eva": 0, "pass": false, "art": "water", "leap_over": true},
+	"shrine": {"name": "神龛", "cost": 99, "eva": 0, "pass": false, "art": "stone"},
+	"trap": {"name": "陷阱", "cost": 1, "eva": -5, "pass": true, "art": "mud"},
+	"cart": {"name": "货车", "cost": 99, "eva": 0, "pass": false, "art": "bridge"},
 }
 
 const CODES := {
@@ -24,7 +27,7 @@ const CODES := {
 	"r": "ruins", "n": "snow", "b": "bridge", "x": "wall",
 	# Wuxia B1 char-grid (青崖渡)
 	".": "grass", "~": "water", "=": "stone", "C": "crate", "m": "mud", "#": "wall",
-	"h": "low_wall",
+	"h": "low_wall", "S": "shrine", "T": "trap", "V": "cart",
 }
 
 const EFFECT_NAMES := {"fire": "燃烧", "ice": "冰冻"}

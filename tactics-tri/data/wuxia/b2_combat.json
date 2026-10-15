@@ -1,5 +1,5 @@
 {
-  "status": "B2《竹林遗匣》单位；技能表仍由 b1_combat.json 加载",
+  "status": "B2平衡抽样 v1：双方AI 24种子 15胜9负0超时，胜率62.5%，平均约25回合；单位数值未改。清场后走向遗匣。技能表仍由 b1_combat.json 加载。不代表最终定案",
   "units": [
     {"id": 0, "name": "剑客", "side": "player", "facing": [0, -1], "hp": 31, "max_hp": 31, "strength": 4, "armor": 3, "accuracy": 5, "evasion": 5, "speed": 88, "qi": 12, "skills": ["破风剑", "回锋剑", "守关式"], "marker": "A", "inner": "归元诀", "lightfoot": "燕行步", "weapon": "sword"},
     {"id": 1, "name": "枪客", "side": "player", "facing": [0, -1], "hp": 36, "max_hp": 36, "strength": 4, "armor": 4, "accuracy": 0, "evasion": 4, "speed": 61, "qi": 12, "skills": ["穿云枪", "挑枪", "横江刀"], "marker": "B", "inner": "苍松功", "lightfoot": "踏雪步", "weapon": "spear"},

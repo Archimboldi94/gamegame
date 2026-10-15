@@ -8,37 +8,36 @@
 - 迁移计划：`tactics-tri/docs/WUXIA_MIGRATION.md`。
 - Godot：`~/.local/bin/godot` **4.6.3**。
 
-## 本轮已落地（origin/main）
+## 本轮已落地
 
 | 内容 | 说明 |
 |------|------|
-| **B2《竹林遗匣》** | 12×12 地图／战斗 JSON；取匣+撤离胜负；竹林探索入口；《截脉指》+80EXP |
-| **探索等距像素** | 室外／客栈改用战斗 `top_*`／`side_*` 菱形地块（草／泥／石／桥／水／林）；石板路＋渡口货箱＋建筑体块加厚 |
-| B3 脚手架 | `b3_map.json`／`b3_combat.json`＋`build_wuxia_b3`；探索入口仍后续开放 |
-| 精进 AI | 已精进武学评分 +1.25 |
+| **探索城镇** | 室外 48×30 与客栈 14×10 仍用战斗 `assets/tiles` 等距菱形。青崖渡补石板街、河道、木码头、渡船、竹林、林带、民居；客栈／废祠改为可读建筑切片（不再靠墙砖堆屋顶）。客栈室内为木地板、柜台、货架、兵器架。碰撞字符含义不变（`#` `H` `~` 阻挡）。 |
+| **B3《废祠夺簿》** | `leader_pickup`：先击败首领，再在渡簿相邻格花 2AP 取簿（队伍共享）。escort 在 (4,9) 放不可逾越货车；sect 去掉 (6,9) 陷阱并改东侧部署。探索入口已开，台词仍含「无需先去竹林」。奖励渡簿物品 + 每人 140EXP，不重复发放《回锋剑》。 |
+| **B2 平衡** | `--sim=wuxia_b2 --seeds=24`：**15 胜 / 9 负 / 0 超时，胜率 62.5%**，平均约 25 回合。单位数值未改（已落在与 B1 相同的约 40–70% 区间）。清场后幸存者会走向遗匣，避免空转。6 轮消耗品仍未做。 |
 
 ## 验证
 
-- Headless：`godot --headless --path tactics-tri -s tests/run_tests.gd` → **3513 PASS, 0 FAIL**。
-- 截图：
-  - 探索前／后：`art-slice/progress/16_explore_before.png` → `18_explore_after_iso.png`
-  - 客栈前／后：`17_inn_before.png` → `19_inn_after_iso.png`
-  - B2：`15_b2_bamboo.png`（亦在 `tactics-tri/docs/`）
+- Headless：`godot --headless --path tactics-tri --script res://tests/run_tests.gd` → **3614 PASS, 0 FAIL**。
+- 截图（亦在 `tactics-tri/docs/`）：
+  - 探索：`20_explore_town.png` … `24_explore_bamboo.png`（对照旧图 `18_explore_after_iso.png`）
+  - 客栈：`25_inn_interior.png`（对照 `19_inn_after_iso.png`）
+  - B3：`26_b3_shrine.png`
+- B2 抽样：`tactics-tri/docs/b2_sim_stats.json`。
 
 ## 可玩路径
 
-1. 标题 →「江湖·青崖渡」→ 接任务 → **B1 渡口** → 客栈选立场 → **B2 竹林（可选，取匣撤离）** → 废祠 B3 仍提示后续开放。
-2. 标题「渡口截箱」直打 B1；`--shot=wuxia_b2`／`--sim=wuxia_b2` 可用。
+1. 标题 →「江湖·青崖渡」→ 接任务 → **B1 渡口** → 客栈选立场 → **B2 竹林（可选）** 或直接 **废祠 B3**（无需先去竹林）。
+2. `--shot=explore_wide`／`inn`／`wuxia_b3`；`--sim=wuxia_b2`。
 
 ## 未完成 / 开放问题
 
-- B3 完整胜负（先败首领再取渡簿）与 escort／sect 变体未接探索。
-- 探索建筑仍为地块堆砌，未到正式建筑切片；河岸／渡船可读性可再加。
-- B2 6 轮速通消耗品奖励未做；双方 AI 胜率未抽样。
+- B2 的 6 轮速通消耗品奖励仍是【建议】，未做。
+- B3 单位数值未单独调优；默认 escort 布局可玩，胜率未作为本轮目标抽样。
 - Steam 正式八向动画未启动。
 
 ## 下一阶段建议
 
-1. 接线 B3 与立场变体。
-2. 探索建筑／渡口专用装饰切片。
-3. B2 难度与 `--sim=wuxia_b2` 平衡。
+1. 按实机手感再调 B3 敌方数值，并用 `--sim=wuxia_b3` 抽样。
+2. 若要做 B2 速通消耗品，单独接奖励，不改取匣条件。
+3. 探索建筑可再加屋檐遮挡与更细的码头变体，不改碰撞字符。
