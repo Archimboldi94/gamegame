@@ -61,6 +61,8 @@ func _run_all() -> void:
 		"test_chapter_b3_rewards", "test_shrine_battle_entry_and_return",
 		"test_b3_simulation_variants_and_campaign_party",
 		"test_cleared_mission_ai_finishes_objective",
+		"test_trap_path_forecast_and_lightfoot", "test_trap_retreat_and_forced_push",
+		"test_trap_hud_confirmation_and_spent_marker",
 	]
 	for t in tests:
 		_current = t
@@ -3329,4 +3331,158 @@ func test_shrine_battle_entry_and_return() -> void:
 	game.shot = old_shot
 	game.current_battle = old_battle
 	game.step = old_step
+
+
+func test_trap_path_forecast_and_lightfoot() -> void:
+	var map := BattleMap.flat(7, 5)
+	map.set_terrain(Vector2i(3, 2), "trap")
+	var a := wuxia_unit(0, BattleUnit.PLAYER, Vector2i(2, 2))
+	var b := wuxia_unit(1, BattleUnit.ENEMY, Vector2i(1, 2))
+	b.facing = 2
+	var s := state_with(map, [a, b])
+	s.mission = {"trap_damage": 8, "spent_traps": []}
+	s.begin_next_turn()
+	var before := [a.hp, a.ap, a.qi, a.pos, b.rp, s.rng.state, s.mission.duplicate(true)]
+	var path := [a.pos, Vector2i(3, 2), Vector2i(4, 2), Vector2i(3, 2)]
+	var risks := s.path_dangers(a, path)
+	eq(risks.size(), 2, "one opportunity and one trap along a looping path")
+	eq([risks[0]["type"], risks[1]["type"]], ["opportunity", "trap"], "reaction precedes entering the trap on the same step")
+	eq(risks[1]["dmg"], s.trap_damage_at(Vector2i(3, 2)), "preview and resolution share trap damage")
+	eq([a.hp, a.ap, a.qi, a.pos, b.rp, s.rng.state, s.mission], before, "hazard preview changes no resources flags positions or RNG")
+	var immune := s.path_dangers(a, path, true)
+	eq(immune.size(), 1, "opportunity immunity retains the trap warning")
+	eq(immune[0]["type"], "trap", "Yanxing exempts only opportunity attacks")
+	s.move_unit(a, Vector2i(3, 2))
+	eq(s.pending_traps.size(), 1, "normal entry resolves one trap event")
+	check(s.trap_spent(Vector2i(3, 2)), "entry consumes the shared trap")
+	eq(s.trap_damage_at(Vector2i(3, 2)), 0, "spent trap has zero forecast damage")
+	eq(s.path_dangers(a, [Vector2i(4, 2), Vector2i(3, 2)], true), [], "spent trap no longer warns")
+	# No endpoint-only check: both lightfoot arts must warn and stop when an
+	# intermediate trap defeats the mover, while charging the fixed skill cost.
+	for sid in ["燕行步", "踏雪步"]:
+		var leap_map := BattleMap.flat(7, 1)
+		leap_map.set_terrain(Vector2i(3, 0), "trap")
+		var u := wuxia_unit(0, BattleUnit.PLAYER, Vector2i(2, 0))
+		u.hp = 5
+		var battle := state_with(leap_map, [u])
+		battle.mission = {"trap_damage": 8, "spent_traps": []}
+		battle.begin_next_turn()
+		var goal := Vector2i(4, 0)
+		var route := Pathing.path_to(battle.lightfoot_reach(u, u.skill(sid), u.pos), u.pos, goal)
+		var warnings := battle.path_dangers(u, route, sid == "燕行步")
+		eq(warnings.size(), 1, sid + " forecasts the intermediate trap")
+		if warnings.is_empty():
+			continue
+		check(warnings[0]["lethal"], sid + " marks certain defeat from trap damage")
+		var events := battle.execute(u, sid, goal)
+		eq(u.pos, Vector2i(3, 0), sid + " stops on the lethal intermediate trap")
+		eq(u.hp, 0, sid + " trap defeats the mover")
+		eq(u.ap, 4, sid + " charges the fixed 2AP even when interrupted")
+		eq(event_count(events, "trap"), 1, sid + " resolves the forecast trap once")
+		eq(event_count(events, "leap"), 1, sid + " does not animate movement past defeat")
+		check(not u.guard, sid + " cannot grant landing guard after interrupted movement")
+		check(not battle.order.entries.has(u.id), sid + " defeated unit leaves the speed queue")
+
+
+func test_trap_retreat_and_forced_push() -> void:
+	for safe in [false, true]:
+		var map := BattleMap.flat(6, 5)
+		map.set_terrain(Vector2i(1, 2), "trap")
+		var a := wuxia_unit(0, BattleUnit.PLAYER, Vector2i(2, 2))
+		var b := wuxia_unit(1, BattleUnit.ENEMY, Vector2i(3, 2))
+		b.rp = 0
+		if safe:
+			a.skill_branches["回锋剑"] = "游身"
+		var s := state_with(map, [a, b])
+		s.mission = {"trap_damage": 8, "spent_traps": []}
+		var route := s.retreat_path(a, b.pos)
+		eq(s.path_dangers(a, route, safe)[0]["type"], "trap", "retreat forecasts trap even with safe-exit refinement")
+		var events := s.execute(a, "回锋剑", b.pos)
+		eq(a.pos, Vector2i(1, 2), "retreat reaches the trap")
+		eq(a.hp, 92, "retreat triggers the same 8 trap damage")
+		eq(a.ap, 3, "free retreat adds no movement AP cost")
+		eq(event_count(events, "trap"), 1, "retreat trap event emitted once")
+	var map := BattleMap.flat(7, 5)
+	map.set_terrain(Vector2i(3, 2), "trap")
+	var a := wuxia_unit(0, BattleUnit.PLAYER, Vector2i(1, 2))
+	a.skill_branches["震山掌"] = "摧阵"
+	var b := wuxia_unit(1, BattleUnit.ENEMY, Vector2i(2, 2))
+	b.hp = 19 # Survives 12 attack damage, then falls to the trap before step 2.
+	var s := state_with(map, [a, b])
+	s.mission = {"trap_damage": 8, "spent_traps": []}
+	var preview: Dictionary = s.preview(a, "震山掌", b.pos)[0]
+	eq(preview["push_traps"].size(), 1, "push forecast includes the trap after a successful hit")
+	eq(preview["push_path"], [Vector2i(2, 2), Vector2i(3, 2), Vector2i(4, 2)], "push forecast uses the shared legal route")
+	var events := s.execute(a, "震山掌", b.pos)
+	eq(b.hp, 0, "attack plus trap defeats the pushed target")
+	eq(b.pos, Vector2i(3, 2), "two-tile push stops at the lethal first tile")
+	eq(event_count(events, "trap"), 1, "push emits one trap event")
+	eq(event_count(events, "knockback"), 1, "push does not continue after defeat")
+	eq(event_count(events, "opportunity"), 0, "forced movement still does not trigger opportunity attacks")
+	check(s.trap_spent(Vector2i(3, 2)), "forced entry consumes the shared trap")
+	# A second target can pass through the spent tile without extra damage.
+	b.hp = 100
+	b.pos = Vector2i(2, 2)
+	a.ap = 6
+	a.qi = 12
+	events = s.execute(a, "震山掌", b.pos)
+	eq(event_count(events, "trap"), 0, "spent trap cannot trigger again through another push")
+	eq(b.hp, 88, "second push deals only attack damage")
+	eq(b.pos, Vector2i(4, 2), "nonlethal push completes its legal range")
+	b.pos = Vector2i(2, 2)
+	b.hp = 100
+	a.ap = 6
+	a.qi = 12
+	s.mission["spent_traps"] = []
+	force_next_wuxia_miss(s)
+	events = s.execute(a, "震山掌", b.pos)
+	eq(b.pos, Vector2i(2, 2), "miss does not push the target into a trap")
+	eq(b.hp, 100, "miss causes no attack or trap damage")
+	eq(event_count(events, "trap"), 0, "miss produces no trap event")
+	check(not s.trap_spent(Vector2i(3, 2)), "miss cannot consume the trap")
+
+
+func test_trap_hud_confirmation_and_spent_marker() -> void:
+	var game = root.get_node("Game")
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	game.shot = "wuxia_b3"
+	game.current_battle = "wuxia_b3"
+	var battle = load("res://scenes/battle.tscn").instantiate()
+	root.add_child(battle)
+	var u: BattleUnit = battle.state.current()
+	for other in battle.state.units:
+		if other != u:
+			other.hp = 0
+	u.pos = Vector2i(6, 10)
+	var trap := Vector2i(6, 9)
+	battle._refresh_all()
+	battle._enter_main()
+	var before := [u.hp, u.ap, u.qi, u.pos, battle.state.rng.state]
+	battle._request_move(trap)
+	eq(battle.mode, "move_confirm", "trap-only path requires explicit confirmation")
+	check(battle.preview_text.text.contains("进入扣8气血"), "preview discloses exact trap damage")
+	eq(battle.tiles[trap].hl2, battle.COL_PATH_RISK, "trap marked on the movement path")
+	battle._cancel()
+	eq([u.hp, u.ap, u.qi, u.pos, battle.state.rng.state], before, "cancel trap confirmation changes nothing")
+	check(not battle.state.trap_spent(trap), "cancel does not disarm the trap")
+	battle._enter_target("燕行步")
+	battle._select_target(trap)
+	check(battle.preview_text.text.contains("进入扣8气血") and battle.preview_text.text.contains("燕行步豁免"), "lightfoot forecasts trap separately from ZoC immunity")
+	check(battle.preview_text.text.contains("AP2 内力4"), "hazard preview preserves the true lightfoot cost")
+	battle._cancel()
+	battle._request_move(trap)
+	battle._confirm_move()
+	await create_timer(0.4).timeout
+	eq(u.hp, int(before[0]) - 8, "confirmed movement resolves forecast damage")
+	eq(u.ap, int(before[1]) - 1, "confirmed movement spends one AP")
+	check(battle.tiles[trap].trap_spent, "spent state reaches the map drawing")
+	battle._show_tile_info(trap)
+	check(battle.info_text.text.contains("陷阱已触发"), "left-bottom tile info identifies a spent trap")
+	eq(battle._preview_move(Vector2i(6, 10)), [], "leaving a spent trap is safe")
+	await process_frame
+	check_hud_bounds(battle)
+	battle.free()
+	game.shot = old_shot
+	game.current_battle = old_battle
 

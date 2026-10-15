@@ -270,6 +270,35 @@ func path_reactions(u: BattleUnit, path: Array, immune := false, initial_facing 
 	return out
 
 
+## Read-only movement forecast. Reactions happen before leaving; traps happen on
+## entering. Lightfoot's opportunity immunity does not disable ground traps.
+## Later entries are conditional on surviving earlier reactions.
+func path_dangers(u: BattleUnit, path: Array, immune := false, initial_facing := -1) -> Array:
+	var out := []
+	if u == null or not u.use_gdd_rules:
+		return out
+	var reactions := path_reactions(u, path, immune, initial_facing)
+	var seen_traps := {}
+	var remaining_hp := u.hp
+	for i in range(1, path.size()):
+		for reaction in reactions:
+			if int(reaction["step"]) == i:
+				var risk: Dictionary = reaction.duplicate()
+				risk["type"] = "opportunity"
+				out.append(risk)
+		var tile: Vector2i = path[i]
+		var damage := trap_damage_at(tile)
+		if damage <= 0 or seen_traps.has(tile):
+			continue
+		seen_traps[tile] = true
+		remaining_hp -= damage
+		out.append({"type": "trap", "from": path[i - 1], "to": tile, "step": i,
+			"dmg": damage, "hit": 100, "lethal": remaining_hp <= 0})
+		if remaining_hp <= 0:
+			break
+	return out
+
+
 ## Auto-counter eligibility on hit/miss, including knockback and free retreat.
 ## All values are conditional on surviving any preceding reactions.
 func counter_preview(u: BattleUnit, sid: String, target: BattleUnit) -> Dictionary:
@@ -298,9 +327,14 @@ func counter_preview(u: BattleUnit, sid: String, target: BattleUnit) -> Dictiona
 		subject.guard = u.guard
 		subject.block = u.block
 		if landed and sk.get("effect") == "wuxia_push":
-			var dest := target.pos + Vector2i(signi(target.pos.x - u.pos.x), signi(target.pos.y - u.pos.y))
-			if Pathing.enter_cost(map, target.jump, target.pos, dest, target.flying) >= 0 and unit_at(dest) == null:
+			var pushed_hp := target.hp - int(attack["dmg"])
+			for dest in push_path(target, u.pos, int(sk.get("push_distance", 1))).slice(1):
 				defender.pos = dest
+				pushed_hp -= trap_damage_at(dest)
+				if pushed_hp <= 0:
+					break
+			if pushed_hp <= 0:
+				continue
 		if sk.get("effect") == "retreat":
 			var path := retreat_path(u, target.pos)
 			if not path.is_empty():
@@ -309,6 +343,8 @@ func counter_preview(u: BattleUnit, sid: String, target: BattleUnit) -> Dictiona
 				if not bool(sk.get("retreat_safe", false)) and not sources.is_empty() and sources[0] == target:
 					continue  # target spent its RP on retreat's opportunity attack
 				subject.pos = dest
+				if trap_damage_at(dest) >= u.hp:
+					continue
 		if not ControlZone.can_react(defender, subject, map, subject.pos):
 			continue
 		branches.append("命中后" if landed else "落空后")
@@ -396,6 +432,9 @@ func preview(u: BattleUnit, sid: String, tile: Vector2i, from := Vector2i(-999, 
 			continue
 		var e := Combat.calc(u, t, sk, map, from)
 		e["unit"] = t
+		if u.use_gdd_rules and sk.get("effect") == "wuxia_push":
+			e["push_path"] = push_path(t, from, int(sk.get("push_distance", 1)))
+			e["push_traps"] = path_dangers(t, e["push_path"], true)
 		if not u.use_gdd_rules and sk["kind"] == "phys" and PINCER_SHAPES.has(sk["shape"]) and p == tile:
 			var partner := pincer_partner(u, t, from)
 			if partner != null:
@@ -584,6 +623,7 @@ func _retreat(u: BattleUnit, sk: Dictionary, target: Vector2i) -> Array:
 		u.pos = dest
 		u.moved_tiles += 1
 		events.append({"type": "retreat", "unit": u, "from": old, "to": dest})
+		events.append_array(_enter_trap(u))
 	return events
 
 
@@ -597,16 +637,29 @@ func retreat_path(u: BattleUnit, target: Vector2i) -> Array:
 
 
 ## GDD forced movement: eight directions, no collision or falling bonus damage, no ZoC.
-func _wuxia_push(t: BattleUnit, from: Vector2i, distance := 1) -> Array:
+func push_path(t: BattleUnit, from: Vector2i, distance := 1) -> Array:
 	var step := Vector2i(signi(t.pos.x - from.x), signi(t.pos.y - from.y))
-	var events := []
+	var path := [t.pos]
+	if step == Vector2i.ZERO:
+		return path
 	for _i in maxi(1, distance):
-		var dest := t.pos + step
-		if Pathing.enter_cost(map, t.jump, t.pos, dest, t.flying) < 0 or unit_at(dest) != null:
+		var last: Vector2i = path[-1]
+		var dest := last + step
+		if Pathing.enter_cost(map, t.jump, last, dest, t.flying) < 0 or unit_at(dest) != null:
 			break
+		path.append(dest)
+	return path
+
+
+func _wuxia_push(t: BattleUnit, from: Vector2i, distance := 1) -> Array:
+	var events := []
+	for dest in push_path(t, from, distance).slice(1):
 		var old_pos := t.pos
 		t.pos = dest
 		events.append({"type": "knockback", "unit": t, "from": old_pos, "to": dest, "amount": 0, "killed": false})
+		events.append_array(_enter_trap(t))
+		if not t.alive():
+			break
 	return events
 
 
@@ -727,14 +780,19 @@ func trap_spent(cell: Vector2i) -> bool:
 	return (mission.get("spent_traps", []) as Array).has(cell)
 
 
+func trap_damage_at(cell: Vector2i) -> int:
+	return maxi(0, int(mission.get("trap_damage", 8))) if map.get_terrain(cell) == "trap" and not trap_spent(cell) else 0
+
+
 ## One-shot tile. Suggested damage lives on the mission so tests can read it.
 func _enter_trap(u: BattleUnit) -> Array:
 	if u == null or not u.alive() or map.get_terrain(u.pos) != "trap" or trap_spent(u.pos):
 		return []
+	var damage := trap_damage_at(u.pos)
 	var spent: Array = (mission.get("spent_traps", []) as Array).duplicate()
 	spent.append(u.pos)
 	mission["spent_traps"] = spent
-	var dealt := u.take_damage(int(mission.get("trap_damage", 8)))
+	var dealt := u.take_damage(damage)
 	if not u.alive():
 		order.remove(u.id)
 	return [{"type": "trap", "unit": u, "amount": dealt, "killed": not u.alive(), "tile": u.pos}]

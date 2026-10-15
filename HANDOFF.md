@@ -9,12 +9,12 @@
 ## 工程
 - 主工程：`tactics-tri/`（Godot 4.6.x）。战斗 HUD 布局以 Claude 版 `f77192b` 为准：顶部时间轴、第N手、右侧菜单、左下地块信息。
 - `wuxia-tactics/archive/` 只放旧工程和历史资料，不在里面开发。
-- 测试：`godot --headless --path tactics-tri --script res://tests/run_tests.gd`，目前 3513 PASS。
+- 测试：`godot --headless --path tactics-tri --script res://tests/run_tests.gd`，目前 3721 PASS、0 FAIL。
 - 自动试玩胜率：`godot --headless --path tactics-tri -- --sim=wuxia_b1 --seeds=24`（B1 约 62%）。
 - 截图：`-- --shot=battle`、`--shot=wuxia_b2` 等。
 
 ## 可玩内容
-标题 →「江湖·青崖渡」→ 探索室外和客栈 → B1 渡口截箱 → 选立场 → B2 竹林遗匣（可选）→ B3 废祠（只搭了脚手架，入口还没开放）。
+标题 →「江湖·青崖渡」→ 探索室外和客栈 → B1 渡口截箱 → 选立场 → B2 竹林遗匣（可选）→ B3 废祠夺簿（两种立场、首领后取簿、章节结算）。
 已有系统：AP/内力/RP、八向格、控制区与反击/借机、六种主动武学和内功/步法、队伍成长、谱库、武学精进、Lv4 专精、存档 v2、能感知控制区的 AI。
 
 ## 美术方向（已定）
@@ -25,10 +25,11 @@
 - 素材来源有 AI 生成，上架 Steam 时要在商店页申报。
 
 ## 下一步建议
-1. B3 完整胜负，接上立场变体和探索入口。
-2. 探索建筑和渡口做专用装饰切片，替换现在用地块堆出来的建筑。
-3. B2 难度平衡（`--sim=wuxia_b2`）。
-4. 八方向行走和攻击动画，并手工重画东北、西北两个朝向。
+1. 真人试玩 B3 两路，检查陷阱／借机预览与操作节奏；24种子AI抽样护镖83.3%、核验暗记70.8%，不是承诺真人胜率。
+2. 八方向行走和攻击动画，并手工重画东北、西北两个朝向。
+3. B2 的6轮速通消耗品奖励仍可后置。
+
+B3 可用 `--sim=wuxia_b3 --stance=escort|sect --sim-party=after_b1 --seeds=24` 复现主线最低整备基准；统计 `turns` 是单位行动次数，`rounds` 是战斗轮次。清场后不会再持续守关而不取簿。普通移动、轻功、回锋后撤及击退入陷阱统一结算；危险移动先确认，已触发陷阱灰显。截图见 `/workspace/art-slice/progress/27_b3_escort_balanced.png` … `30_b3_trap_spent.png`。
 
 ## 约束
 - 不改 storyteller / warchess-pixel / frost。

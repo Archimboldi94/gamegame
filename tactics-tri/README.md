@@ -47,6 +47,8 @@ godot --path . --resolution 1600x900 -- --shot=wuxia_b3 --stance=sect --sim-part
 
 统计中的 `turns` 是**单位行动次数**，`rounds` 才是全体按速度队列行动一次的**战斗轮次**。B3 胜局还记录 `leader_fallen` 和 `objective_taken`，防止把单纯清场误计为胜利；AI 抽样不等同于真人胜率。
 
+B3 的未触发陷阱在移动／轻功／后撤预览中显示位置与伤害；普通危险移动需确认，取消不扣资源。陷阱由实际入格触发（包括震山掌击退），只生效一次，触发后变灰；强制位移仍不触发借机攻击。可用 `--shot=wuxia_b3_trap`、`--shot=wuxia_b3_spent` 配合 `--stance=escort` 复现预警／触发后画面。
+
 ## 目录
 - `scripts/rules/` 规则与数据；`scripts/game/` 场景与表现；`scenes/` 场景
 - `data/wuxia/` B1 地图与战斗数据；`assets/` 运行时贴图；`audio/`、`fonts/`

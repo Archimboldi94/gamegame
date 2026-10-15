@@ -114,11 +114,13 @@ func _ready() -> void:
 	_refresh_all()
 	AudioManager.play_bgm("bgm_battle_loop")
 	AudioManager.play_ambience("amb_night_wind")
-	if Game.shot in ["wuxia", "wuxia_b1", "wuxia_b2", "wuxia_b3"]:
+	if Game.shot in ["wuxia", "wuxia_b1", "wuxia_b2", "wuxia_b3", "wuxia_b3_trap", "wuxia_b3_spent"]:
 		state.begin_next_turn()
 		_refresh_all()
 		_set_active(state.current())
 		_enter_main()
+		if Game.shot in ["wuxia_b3_trap", "wuxia_b3_spent"]:
+			_setup_trap_shot()
 	elif Game.shot.begins_with("battle"):
 		_setup_shot()
 	elif Game.autoplay != "":
@@ -347,8 +349,10 @@ func _refresh_effects() -> void:
 	for p in tiles:
 		var tn = tiles[p]
 		var eff := state.map.effect_at(p)
-		if tn.effect != eff:
+		var spent := state.trap_spent(p)
+		if tn.effect != eff or tn.trap_spent != spent:
 			tn.effect = eff
+			tn.trap_spent = spent
 			tn.queue_redraw()
 
 
@@ -451,7 +455,10 @@ func _show_tile_info(p: Vector2i) -> void:
 func _terrain_text(p: Vector2i) -> String:
 	var tinfo := Terrain.info(state.map.get_terrain(p))
 	if state.gdd_mode:
-		return ("地形：%s  移动%dAP  命中修正%+d%%" % [tinfo["name"], state.map.move_cost(p), -state.map.evasion(p)]) if tinfo["pass"] else ("地形：%s  [color=#ff9a80]无法进入[/color]" % tinfo["name"])
+		var text := ("地形：%s  移动%dAP  命中修正%+d%%" % [tinfo["name"], state.map.move_cost(p), -state.map.evasion(p)]) if tinfo["pass"] else ("地形：%s  [color=#ff9a80]无法进入[/color]" % tinfo["name"])
+		if state.map.get_terrain(p) == "trap":
+			text += "\n陷阱已触发 · 再次进入不受伤" if state.trap_spent(p) else "\n[color=#ff9a80]陷阱：进入扣%d气血 · 仅触发一次[/color]" % state.trap_damage_at(p)
+		return text
 	if not tinfo["pass"]:
 		return "地形：%s  高度%d  [color=#ff9a80]无法进入[/color]%s" % [
 			tinfo["name"], state.map.get_h(p), "（仅飞行单位可越过）" if tinfo.get("fly", false) else ""]
@@ -957,7 +964,7 @@ func _preview_move(cell: Vector2i) -> Array:
 
 func _show_path_preview(path: Array, ap_cost: int, immune := false, heading := "移动") -> Array:
 	_clear_hl2()
-	var risks := state.path_reactions(state.current(), path, immune)
+	var risks := state.path_dangers(state.current(), path, immune)
 	for p in path:
 		_set_hl(p, COL_PATH, true)
 	var t := "%s · 消耗 AP%d 内力0\n移动后 AP %d/%d · 内力 %d/%d\n" % [heading, ap_cost, maxi(0, state.current().ap - ap_cost), state.current().max_ap, state.current().qi, state.current().max_qi]
@@ -970,12 +977,17 @@ func _show_path_preview(path: Array, ap_cost: int, immune := false, heading := "
 	return risks
 
 
-func _path_risk_text(risks: Array, immune: bool) -> String:
+func _path_risk_text(risks: Array, immune: bool, immunity_label := "燕行步") -> String:
 	var t := ""
+	var has_reaction := false
 	for risk in risks:
-		t += "[color=#ff7060]离开控制区：%s 借机攻击（RP %d/1）\n命中 %d%% · 命中后伤害 %d[/color]\n" % [risk["source"].name, risk["source"].rp, risk["hit"], risk["dmg"]]
-	if risks.is_empty():
-		t += "借机攻击：无" + ("（燕行步豁免）" if immune else "")
+		if risk.get("type", "opportunity") == "trap":
+			t += "[color=#ff7060]陷阱 (%d,%d)：进入扣%d气血 · 仅触发一次%s[/color]\n" % [risk["to"].x, risk["to"].y, risk["dmg"], " · 将倒地" if risk.get("lethal", false) else ""]
+		else:
+			has_reaction = true
+			t += "[color=#ff7060]离开控制区：%s 借机攻击（RP %d/1）\n命中 %d%% · 命中后伤害 %d[/color]\n" % [risk["source"].name, risk["source"].rp, risk["hit"], risk["dmg"]]
+	if not has_reaction:
+		t += "借机攻击：无" + ("（%s豁免）" % immunity_label if immune else "")
 	return t
 
 
@@ -1148,12 +1160,15 @@ func _show_preview(sk: Dictionary, entries: Array) -> void:
 				t += "自动反击：无（目标RP %d/1、位置或招式条件不符）\n" % tu.rp
 			else:
 				t += "[color=#ffb080]自动反击：可能（RP %d/1，%s）\n反击命中 %d%% · 命中后伤害 %d[/color]\n" % [tu.rp, counter["condition"], counter["hit"], counter["dmg"]]
+			for danger in e.get("push_traps", []):
+				t += "[color=#ffb080]命中且目标存活后击退入陷阱：额外扣%d气血 · 仅触发一次[/color]\n" % danger["dmg"]
+				_set_hl(danger["to"], COL_PATH_RISK, true)
 			if sk.get("effect") == "retreat":
 				var u := state.current()
 				var path := state.retreat_path(u, tu.pos)
-				var risks := state.path_reactions(u, path, bool(sk.get("retreat_safe", false)), Combat.dir_toward(u.pos, tu.pos, u.facing))
+				var risks := state.path_dangers(u, path, bool(sk.get("retreat_safe", false)), Combat.dir_toward(u.pos, tu.pos, u.facing))
 				if not path.is_empty():
-					t += "自主后撤（反应者仍存活时）：\n" + _path_risk_text(risks, bool(sk.get("retreat_safe", false))) + "\n"
+					t += "自主后撤（反应者仍存活时）：\n" + _path_risk_text(risks, bool(sk.get("retreat_safe", false)), "本次后撤") + "\n"
 				for risk in risks:
 					_set_hl(risk["from"], COL_PATH_RISK, true)
 					_set_hl(risk["to"], COL_PATH_RISK, true)
@@ -1553,7 +1568,8 @@ func _secondary(e: Dictionary, att: BattleUnit, shown: Dictionary) -> void:
 		"trap":
 			n.flash(Color(0.85, 0.35, 0.2), 0.8, 0.25)
 			fx.number(n.body_pos() + Vector2(0, -70), "陷阱 %d" % int(e["amount"]), Color(1.0, 0.45, 0.3))
-			n.drain_hp(t.hp)
+			shown[t.id] = int(shown[t.id]) - int(e["amount"])
+			n.drain_hp(shown[t.id])
 			await _wait(0.2)
 		"delay":
 			n.flash(Color(0.6, 0.9, 1.0), 0.8, 0.35)
@@ -2019,7 +2035,7 @@ func _request_move(cell: Vector2i) -> void:
 			mode = "move_confirm"
 			pending_move = cell
 			_set_cursor(cell)
-			_hint("红色路径将离开敌方控制区，可能遭借机攻击；再次点击落点或确认")
+			_hint("红色路径含借机或陷阱风险；再次点击落点或确认")
 			_set_menu([["确认危险移动", _confirm_move, true], ["取消", _enter_main, true]], _menu_title(state.current()))
 			return
 	_do_move(cell)
@@ -2031,6 +2047,22 @@ func _confirm_move() -> void:
 
 
 # ================================================================== screenshot setup
+
+## Reproducible hazard fixtures resolve through the same rules as player movement.
+func _setup_trap_shot() -> void:
+	var u := state.current()
+	u.pos = Vector2i(6, 10)
+	if Game.shot == "wuxia_b3_spent":
+		state.move_unit(u, Vector2i(6, 9))
+		state.move_unit(u, Vector2i(6, 10))
+	_refresh_all()
+	_enter_main()
+	_show_tile_info(Vector2i(6, 9))
+	if Game.shot == "wuxia_b3_trap":
+		_request_move(Vector2i(6, 9))
+	else:
+		_preview_move(Vector2i(6, 9))
+
 
 func _setup_shot() -> void:
 	var lord: BattleUnit = null

@@ -385,11 +385,11 @@ func _do_shot() -> void:
 		"vote":
 			step = 4
 			_change("vote")
-		"battle", "battlemain", "battlefx", "wuxia", "wuxia_b1", "wuxia_b2", "wuxia_b3":
+		"battle", "battlemain", "battlefx", "wuxia", "wuxia_b1", "wuxia_b2", "wuxia_b3", "wuxia_b3_trap", "wuxia_b3_spent":
 			step = 2
 			if shot == "wuxia_b2":
 				current_battle = "wuxia_b2"
-			elif shot == "wuxia_b3":
+			elif shot.begins_with("wuxia_b3"):
 				current_battle = "wuxia_b3"
 			elif shot in ["wuxia", "wuxia_b1"]:
 				current_battle = "wuxia_b1"
