@@ -1697,7 +1697,7 @@ func _setup_shot() -> void:
 	_set_active(lord)
 	# Show the complete diorama between the top chips and bottom HUD in captures.
 	cam.position = view.screen(Vector2i(4, 4), 0) + Vector2(30, 40)
-	cam.zoom = Vector2.ONE * 0.86
+	cam.zoom = Vector2.ONE * ZOOM_DEFAULT  # 1:1 so unit art is shown at native resolution
 	if Game.shot == "battlemain":
 		state.moved = false
 		_enter_main()

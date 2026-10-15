@@ -13,7 +13,7 @@ const DATA := {
 	"snow": {"name": "积雪", "cost": 2, "eva": 0, "pass": true},
 	"bridge": {"name": "木桥", "cost": 1, "eva": 0, "pass": true},
 	"wall": {"name": "高墙", "cost": 99, "eva": 0, "pass": false},
-	"mud": {"name": "泥地", "cost": 2, "eva": 0, "pass": true, "art": "ruins"},
+	"mud": {"name": "泥地", "cost": 2, "eva": 0, "pass": true, "art": "mud"},
 	"crate": {"name": "木箱", "cost": 99, "eva": 0, "pass": false, "art": "bridge"},
 }
 

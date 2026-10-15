@@ -2,10 +2,11 @@ extends Node2D
 ## Visual for one BattleUnit: team ring, facing arrow, chibi sprite, HP bar, active marker,
 ## plus the procedural hit reactions (flash shader, shake, HP drain, death fade).
 
-const SPRITE_RECT := Rect2(-50, -136, 100, 150)
+const SPRITE_RECT := Rect2(-32, -146, 62, 148)  # default body bounds; real bounds come from the texture
 const SEE_THROUGH_ALPHA := 0.32
-const SPRITE_POS := Vector2(-48, -116)
-const BODY := Vector2(0, -58)
+const SPRITE_POS := Vector2(-80, -196)  # 160x200 frame, feet at (80, 196)
+const TALL_CLASSES := {"warlord": 30.0}  # extra HUD lift for oversized (boss) frames
+const BODY := Vector2(0, -72)
 const FLASH_SHADER := """
 shader_type canvas_item;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
@@ -26,6 +27,13 @@ var active := false
 var see_through := false
 var _see_tw: Tween
 var t := 0.0
+var lift := 0.0  # how far the HP/TP HUD sits above the default height
+var body_rect := SPRITE_RECT
+var tex_base := ""
+var _tex_cache := {}
+## Screen-direction index (IsoView.ISO_DIR) -> [source view, flip]. Source art faces screen-right.
+const DIR_VIEW := [["N", false], ["W", false], ["SW", false], ["S", false],
+	["SW", true], ["W", true], ["N", true], ["N", false]]
 var display_hp := 1.0:  # green bar; held at the pre-hit value until the hit lands
 	set(v):
 		display_hp = v
@@ -46,11 +54,17 @@ func setup(u: BattleUnit, v: IsoView) -> void:
 	mat.shader = _shader
 	sprite = Sprite2D.new()
 	var team := "player" if u.team == BattleUnit.PLAYER else "enemy"
+	tex_base = "res://assets/units/dirs/%s_%s_" % [u.cls, team]
 	sprite.texture = load("res://assets/units/%s_%s.png" % [u.cls, team])
 	sprite.centered = false
 	sprite.position = SPRITE_POS
 	sprite.material = mat
 	add_child(sprite)
+	lift = TALL_CLASSES.get(u.cls, 0.0)
+	if sprite.texture != null:
+		var used := sprite.texture.get_image().get_used_rect()
+		if used.size.x > 0:
+			body_rect = Rect2(SPRITE_POS + Vector2(used.position), Vector2(used.size))
 	refresh()
 
 
@@ -67,8 +81,20 @@ func body_pos() -> Vector2:
 	return position + BODY
 
 
+func _apply_facing() -> void:
+	var dv: Array = DIR_VIEW[view.facing_view(unit.facing)]
+	var path: String = tex_base + dv[0] + ".png"
+	if not _tex_cache.has(path):
+		_tex_cache[path] = load(path) if ResourceLoader.exists(path) else null
+	if _tex_cache[path] != null:
+		sprite.texture = _tex_cache[path]
+		sprite.flip_h = dv[1]
+	else:
+		sprite.flip_h = view.faces_left(unit.facing)
+
+
 func refresh() -> void:
-	sprite.flip_h = view.faces_left(unit.facing)
+	_apply_facing()
 	visible = unit.alive()
 	display_hp = unit.hp
 	trail_hp = unit.hp
@@ -77,7 +103,7 @@ func refresh() -> void:
 
 ## Syncs only the facing (sprite flip + arrow) without touching the HP bar mid-animation.
 func face() -> void:
-	sprite.flip_h = view.faces_left(unit.facing)
+	_apply_facing()
 	queue_redraw()
 
 
@@ -87,6 +113,7 @@ func set_see_through(on: bool) -> void:
 	if on == see_through:
 		return
 	see_through = on
+	queue_redraw()
 	if _see_tw != null:
 		_see_tw.kill()
 	var a := SEE_THROUGH_ALPHA if on else 1.0
@@ -96,7 +123,7 @@ func set_see_through(on: bool) -> void:
 
 
 func world_rect() -> Rect2:
-	return Rect2(position + SPRITE_RECT.position, SPRITE_RECT.size)
+	return Rect2(position + body_rect.position, body_rect.size)
 
 
 func hold_hp(v: int) -> void:
@@ -219,26 +246,35 @@ func _draw() -> void:
 	var base := Vector2(v.x * 40.0, v.y * 40.0)
 	draw_colored_polygon(PackedVector2Array([tip, base + perp * 13.0, base - perp * 13.0]), col.lightened(0.2))
 	draw_polyline(PackedVector2Array([tip, base + perp * 13.0, base - perp * 13.0, tip]), Color(0, 0, 0, 0.6), 2.0)
+	if see_through:
+		# a faded occluder hides its HUD so it never stacks over the bars of the unit behind it
+		if active:
+			_draw_marker()
+		return
 	var ratio := clampf(display_hp / float(unit.max_hp), 0.0, 1.0)
 	var trail := clampf(trail_hp / float(unit.max_hp), 0.0, 1.0)
-	draw_rect(Rect2(-40, -134, 80, 14), Color(0, 0, 0, 0.8))
+	draw_rect(Rect2(-40, -166 - lift, 80, 14), Color(0, 0, 0, 0.8))
 	if trail > ratio:
-		draw_rect(Rect2(-38, -132, 76.0 * trail, 10), Color(1.0, 0.95, 0.85))
+		draw_rect(Rect2(-38, -164 - lift, 76.0 * trail, 10), Color(1.0, 0.95, 0.85))
 	var hp_col := Color(0.35, 0.9, 0.4) if ratio > 0.5 else (Color(1.0, 0.8, 0.25) if ratio > 0.25 else Color(1.0, 0.3, 0.25))
-	draw_rect(Rect2(-38, -132, 76.0 * ratio, 10), hp_col)
+	draw_rect(Rect2(-38, -164 - lift, 76.0 * ratio, 10), hp_col)
 	for i in unit.max_tp:
 		var c := Color(0.55, 0.85, 1.0) if i < unit.tp else Color(0.2, 0.22, 0.3)
-		draw_rect(Rect2(-38 + i * 16, -145, 13, 8), c)
+		draw_rect(Rect2(-38 + i * 16, -177 - lift, 13, 8), c)
 	if unit.is_leader:
-		_star(Vector2(50, -130), 12.0, Color(1.0, 0.82, 0.3))
+		_star(Vector2(50, -162 - lift), 12.0, Color(1.0, 0.82, 0.3))
 	if unit.is_lord:
-		_star(Vector2(50, -130), 12.0, Color(0.6, 0.85, 1.0))
+		_star(Vector2(50, -162 - lift), 12.0, Color(0.6, 0.85, 1.0))
 	if unit.guard:
-		_shield_badge(Vector2(-52, -128))
+		_shield_badge(Vector2(-52, -160 - lift))
 	if active:
-		var y := -178.0 + sin(t * 5.0) * 6.0
-		draw_colored_polygon(PackedVector2Array([Vector2(-16, y), Vector2(16, y), Vector2(0, y + 20)]), Color(1, 0.9, 0.4))
-		draw_polyline(PackedVector2Array([Vector2(-16, y), Vector2(16, y), Vector2(0, y + 20), Vector2(-16, y)]), Color(0.2, 0.12, 0, 0.8), 2.0)
+		_draw_marker()
+
+
+func _draw_marker() -> void:
+	var y := -210.0 - lift + sin(t * 5.0) * 6.0
+	draw_colored_polygon(PackedVector2Array([Vector2(-16, y), Vector2(16, y), Vector2(0, y + 20)]), Color(1, 0.9, 0.4))
+	draw_polyline(PackedVector2Array([Vector2(-16, y), Vector2(16, y), Vector2(0, y + 20), Vector2(-16, y)]), Color(0.2, 0.12, 0, 0.8), 2.0)
 
 
 func _star(c: Vector2, r: float, col: Color) -> void:
