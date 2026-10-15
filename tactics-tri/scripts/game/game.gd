@@ -158,7 +158,7 @@ func finish_exploration_battle(result: String) -> bool:
 	if not save_chapter():
 		chapter = ChapterState.from_dict(before)
 		return false
-	explore_notice = "首胜 · 队伍收录《回锋剑谱》 · 经验 +100\n可回听雨客栈查看谱库、领取演武心得。" if result == "win" else "已退回战前入口，可再次调查渡口。"
+	explore_notice = "首胜 · 队伍收录《回锋剑谱》 · 出战成员各得 100 EXP\n可回听雨客栈：谱库学习装配、Esc 分配训练点、演武区领心得。" if result == "win" else "已退回战前入口，可再次调查渡口。"
 	exploration_battle.clear()
 	_change("explore")
 	return true

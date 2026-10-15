@@ -51,6 +51,7 @@ func _run_all() -> void:
 		"test_party_preparation_ui", "test_party_exploration_loadout",
 		"test_ai_avoids_pointless_zoc_exit", "test_ai_approach_prefers_safe_path",
 		"test_b1_autoplay_stats_batch",
+		"test_explore_party_status_and_journal", "test_wuxia_hud_shows_traits_and_loadout",
 	]
 	for t in tests:
 		_current = t
@@ -2750,3 +2751,48 @@ func test_b1_autoplay_stats_batch() -> void:
 	check(summary.contains("SIM wuxia_b1") and summary.contains("win_rate="), "summary is machine-readable")
 	# Sanity: default B1 should usually resolve, not hang.
 	check(int(stats["timeouts"]) <= 2, "most default B1 seeds resolve within 300 turns")
+
+
+
+func test_explore_party_status_and_journal() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	game.chapter = ChapterState.new()
+	game.shot = "explore"
+	game.chapter.apply_event("quest_start")
+	game.chapter.apply_event("b1_clear", {"result": "win"})
+	game.chapter.party.gain_exp("sword", 100)
+	var scene = load("res://scenes/explore.tscn").instantiate()
+	root.add_child(scene)
+	await process_frame
+	check(scene.status_label.text.contains("Lv."), "status lists personal levels")
+	check(scene.status_label.text.contains("游锋") and scene.status_label.text.contains("守线"), "status lists fixed traits")
+	check(scene.status_label.text.contains("谱库"), "status lists shared library size")
+	scene._show_journal()
+	check(scene.modal_text.text.contains("同行：") and scene.modal_text.text.contains("Esc 打开队伍成长"), "journal explains party growth and library")
+	check(scene.modal_text.text.contains("队伍谱库"), "journal lists library count")
+	scene.free()
+	game.chapter = old_chapter
+	game.shot = old_shot
+
+
+func test_wuxia_hud_shows_traits_and_loadout() -> void:
+	var game = root.get_node("Game")
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	game.shot = "wuxia"
+	game.current_battle = "wuxia_b1"
+	var battle = load("res://scripts/game/battle.gd").new()
+	root.add_child(battle)
+	var u: BattleUnit = battle.state.units[0]
+	eq(u.innate_trait, "游锋", "sword unit carries Youfeng")
+	battle._show_info(u)
+	var text: String = battle.info_text.get_parsed_text()
+	check(text.contains("固有特质 · 游锋"), "info panel shows innate trait")
+	check(text.contains("装配 ·") and text.contains("破风剑"), "info panel shows prepared arts")
+	var hover: String = battle._hover_unit_text(u, "石板")
+	check(hover.contains("固有 · 游锋"), "hover card shows innate trait")
+	battle.free()
+	game.shot = old_shot
+	game.current_battle = old_battle

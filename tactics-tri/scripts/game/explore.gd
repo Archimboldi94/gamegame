@@ -365,7 +365,7 @@ func _build_ui() -> void:
 	ui.add_child(footer)
 	var row := UIKit.hbox(24)
 	footer.add_child(row)
-	var help := UIKit.label("WASD / 方向键  行走    E / Enter  交互\nTab  任务日志    Esc  队伍与存档", 24, UIKit.IVORY)
+	var help := UIKit.label("WASD / 方向键  行走    E / Enter  交互\nTab  任务日志    Esc  队伍成长与存档    客栈谱库可整备武学", 24, UIKit.IVORY)
 	help.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(help)
 	row.add_child(UIKit.label("剑客 · 枪客 · 拳师\n" + ("门外主路向东 → 渡口" if area == "inn" else "北行 ↑ 竹林 / 废祠    东行 → 渡口"), 23, UIKit.MUTED))
@@ -462,6 +462,9 @@ func _show_journal() -> void:
 	text += ("已接委托" if s.quest_accepted else "尚未接取委托") + "  ·  " + ("渡口已查清" if s.b1_clear else "渡口待调查") + "\n"
 	text += "演武心得：" + ("已领取" if s.lesson_received else "B1 后可领取") + "\n"
 	text += "立场：" + ({"": "尚未选择", "escort": "守约护箱 · 白鹭镖局", "sect": "核验暗记 · 青岚门"}[s.stance]) + "\n"
+	text += "同行：" + _party_summary() + "\n"
+	text += "队伍谱库 %d 门 · 武学心得 %d\n" % [s.party.library.size(), s.party.lesson]
+	text += "Esc 打开队伍成长；客栈谱库可免费学习与装配。\n"
 	text += "竹林遗匣为可选线索；废祠不要求先完成竹林。\nB2 / B3 战斗后续开放。"
 	_show_dialogue("任务日志 [Tab]", text)
 
@@ -488,9 +491,17 @@ func _save_and_title() -> void:
 		_show_dialogue("存档未能写入", "请重试保存，当前章节进度仍保留在此处。")
 
 
+func _party_summary() -> String:
+	var parts: Array[String] = []
+	for id in PartyState.IDS:
+		var c: Dictionary = Game.chapter.party.characters[id]
+		parts.append("%s Lv.%d·%s" % [Game.chapter.party.stats(id)["name"], c["level"], PartyState.TRAITS[id]])
+	return " / ".join(parts)
+
+
 func _refresh_ui() -> void:
 	objective_label.text = "当前 · " + Game.chapter.objective()
-	status_label.text = "同行三人独立成长    心得 %d    队伍谱库 %d 门武学" % [Game.chapter.party.lesson, Game.chapter.party.library.size()]
+	status_label.text = "%s    心得 %d    谱库 %d" % [_party_summary(), Game.chapter.party.lesson, Game.chapter.party.library.size()]
 
 
 func _draw() -> void:

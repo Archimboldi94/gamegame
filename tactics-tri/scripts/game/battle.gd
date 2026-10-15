@@ -415,6 +415,18 @@ func _show_info(u: BattleUnit) -> void:
 		t = "气血 [color=#9f9]%d[/color]/%d  内力 %d/%d%s\n" % [u.hp, u.max_hp, u.qi, u.max_qi, status]
 		t += "AP [color=#8cf]%s %d/%d[/color]  RP 反应 %d/1\n" % [_ap_cells(u), u.ap, u.max_ap, u.rp]
 		t += "劲力%d 护体%d 眼力%+d 身法%d 速度%d\n" % [u.atk, u.def, u.acc, u.eva, u.spd]
+		if u.innate_trait != "":
+			t += "固有特质 · %s\n" % u.innate_trait
+		var loadout: Array[String] = []
+		for sid in u.active_skills:
+			if sid != "":
+				loadout.append(sid)
+		if u.inner != "":
+			loadout.append(u.inner)
+		if u.lightfoot != "":
+			loadout.append(u.lightfoot)
+		if not loadout.is_empty():
+			t += "装配 · %s\n" % " / ".join(loadout)
 	else:
 		t += "攻%d 防%d 魔%d 抗%d 速%d  移%d 跳%d  朝向%s\n" % [
 			u.atk, u.def, u.mag, u.res, u.spd, u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing]]
@@ -1698,6 +1710,8 @@ func _hover_unit_text(unit: BattleUnit, ground: String) -> String:
 			statuses.append("格挡")
 		if unit.ap_penalty > 0 or unit.qi_blocked:
 			statuses.append("气脉受阻")
+		if unit.innate_trait != "":
+			statuses.insert(0, "固有 · %s" % unit.innate_trait)
 		return "%s · %s\n气血 %d/%d · AP %d/%d %s\n内力 %d/%d · RP 反应 %d/1\n劲力%d 护体%d 眼力%+d 身法%d 速度%d\n%s\n%s" % [unit.name, "我方" if unit.team == BattleUnit.PLAYER else "敌方", unit.hp, unit.max_hp, unit.ap, unit.max_ap, _ap_cells(unit), unit.qi, unit.max_qi, unit.rp, unit.atk, unit.def, unit.acc, unit.eva, unit.spd, " · ".join(statuses), ground]
 	return "%s · %s · %s\n生命 %d/%d · 技力%d/%d\n%s" % [unit.name, unit.class_label(), "我方" if unit.team == BattleUnit.PLAYER else "敌方", unit.hp, unit.max_hp, unit.tp, unit.max_tp, ground]
 
