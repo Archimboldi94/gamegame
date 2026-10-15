@@ -43,6 +43,56 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 		if u.tp >= 1 and u.skills.has("guard") and _nearest_dist(best["move"], foes, u.use_gdd_rules) <= 2:
 			best["skill"] = "guard"
 			best["target"] = best["move"]
+	if u.use_gdd_rules:
+		best = _gdd_support(state, u, reach, best, foes, holding)
+	return best
+
+
+
+
+## Prefer rest / guard / lightfoot when attacks are weak or unreachable.
+static func _gdd_support(state: BattleState, u: BattleUnit, reach: Dictionary, best: Dictionary, foes: Array, holding: bool) -> Dictionary:
+	var score := float(best["score"])
+	var current_dist := _nearest_dist(u.pos, foes, true) if not foes.is_empty() else 999
+	# Immune lightfoot when it closes distance and a walk-in attack is not already planned.
+	if (best["skill"] == "" or score < 6.0) and not holding and not foes.is_empty():
+		for sid in u.all_actions():
+			var sk := SkillDB.get_skill(sid)
+			if sk["shape"] != "leap" or not bool(sk.get("opportunity_immune", false)):
+				continue
+			if not state.skill_usable(u, sid):
+				continue
+			for tile in state.target_tiles(u, sid, u.pos):
+				var leap_dist := _nearest_dist(tile, foes, true)
+				if leap_dist >= current_dist:
+					continue
+				var leap_score := 5.5 + float(current_dist - leap_dist) * 3.5
+				if leap_dist > 1:
+					leap_score += 1.0 # still better than idling far away
+				if leap_score > score:
+					best = {"score": leap_score, "move": u.pos, "skill": sid, "target": tile}
+					score = leap_score
+	# Rest / guard from the current tile so approach does not spend the AP first.
+	if score < 12.0:
+		var threatened := threat_count(state, u, u.pos) > 0 or current_dist <= 2
+		var low_hp := float(u.hp) <= float(u.max_hp) * 0.45
+		var need_qi := u.qi <= u.max_qi - 4
+		for sid in ["守关式", "防御", "调息"]:
+			if not u.all_actions().has(sid) or not state.skill_usable(u, sid):
+				continue
+			var sk := SkillDB.get_skill(sid)
+			if int(sk.get("ap", 0)) > u.ap or u.qi < int(sk.get("qi", 0)):
+				continue
+			var support := 0.0
+			if sid == "调息" and need_qi:
+				support = 7.5 + float(u.max_qi - u.qi) * 0.45
+			elif sid != "调息" and (threatened or low_hp) and not u.guard and not u.block:
+				support = 10.0 if low_hp else 6.5
+				if sid == "守关式":
+					support += 1.0
+			if support > score:
+				best = {"score": support, "move": u.pos, "skill": sid, "target": u.pos}
+				score = support
 	return best
 
 

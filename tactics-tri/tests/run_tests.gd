@@ -52,6 +52,7 @@ func _run_all() -> void:
 		"test_ai_avoids_pointless_zoc_exit", "test_ai_approach_prefers_safe_path",
 		"test_b1_autoplay_stats_batch",
 		"test_explore_party_status_and_journal", "test_wuxia_hud_shows_traits_and_loadout",
+		"test_ai_gdd_rest_and_guard", "test_ai_gdd_lightfoot_approach",
 	]
 	for t in tests:
 		_current = t
@@ -2796,3 +2797,46 @@ func test_wuxia_hud_shows_traits_and_loadout() -> void:
 	battle.free()
 	game.shot = old_shot
 	game.current_battle = old_battle
+
+
+
+func test_ai_gdd_rest_and_guard() -> void:
+	var a := wuxia_unit(0, 1, Vector2i(2, 2))
+	a.qi = 2
+	a.max_qi = 12
+	a.ap = 6
+	a.skills = ["调息", "防御", "守关式"]
+	var s := state_with(BattleMap.flat(8, 8), [a])
+	s.current_id = a.id
+	var plan := EnemyAI.plan(s, a)
+	eq(plan["skill"], "调息", "isolated low-qi unit rests")
+	eq(plan["move"], a.pos, "rest keeps current tile")
+	# Adjacent attack would outscore guard; leave the foe one tile out of melee while low on AP.
+	var foe := wuxia_unit(1, 0, Vector2i(4, 2))
+	foe.atk = 12
+	a.hp = 20
+	a.max_hp = 100
+	a.qi = 12
+	a.ap = 2
+	a.skills = ["守关式", "防御", "调息"]
+	s = state_with(BattleMap.flat(8, 8), [a, foe])
+	s.current_id = a.id
+	plan = EnemyAI.plan(s, a)
+	check(plan["skill"] in ["守关式", "防御"], "threatened low-HP unit raises guard when it cannot attack")
+	check(plan["target"] == plan["move"], "guard targets self tile")
+
+
+func test_ai_gdd_lightfoot_approach() -> void:
+	var a := wuxia_unit(0, 1, Vector2i(2, 2))
+	a.ap = 4
+	a.qi = 12
+	a.skills = ["燕行步"]
+	a.lightfoot = "燕行步"
+	# Distance 5: walking cannot both approach and strike within 4 AP, so immune leap wins.
+	var b := wuxia_unit(1, 0, Vector2i(2, 7))
+	b.hp = 40
+	var s := state_with(BattleMap.flat(12, 12), [a, b])
+	s.current_id = a.id
+	var plan := EnemyAI.plan(s, a)
+	eq(plan["skill"], "燕行步", "AI uses immune lightfoot to close distance")
+	check(Pathing.chebyshev(plan["target"], b.pos) < Pathing.chebyshev(a.pos, b.pos), "lightfoot lands closer to the foe")

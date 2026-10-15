@@ -1,582 +1,10 @@
 {
-	"avg_turns": 8.08333333333333,
+	"avg_turns": 11.3333333333333,
 	"battle_id": "wuxia_b1",
 	"losses": 0,
 	"rows": [
 		{
-			"actions": 12,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 5,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 29,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 1,
-			"result": "win",
-			"seed": 1,
-			"turns": 12
-		},
-		{
-			"actions": 6,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 17,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 0,
-			"result": "win",
-			"seed": 2,
-			"turns": 6
-		},
-		{
-			"actions": 6,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 8,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 0,
-			"result": "win",
-			"seed": 3,
-			"turns": 6
-		},
-		{
 			"actions": 10,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 14,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 21,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 17,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 1,
-			"result": "win",
-			"seed": 4,
-			"turns": 10
-		},
-		{
-			"actions": 11,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 14,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 21,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 17,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 1,
-			"result": "win",
-			"seed": 5,
-			"turns": 12
-		},
-		{
-			"actions": 6,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 16,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 0,
-			"result": "win",
-			"seed": 6,
-			"turns": 6
-		},
-		{
-			"actions": 6,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 8,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 0,
-			"result": "win",
-			"seed": 7,
-			"turns": 6
-		},
-		{
-			"actions": 10,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 14,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 1,
-			"result": "win",
-			"seed": 8,
-			"turns": 10
-		},
-		{
-			"actions": 10,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 14,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 21,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 1,
-			"result": "win",
-			"seed": 9,
-			"turns": 10
-		},
-		{
-			"actions": 6,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 16,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 0,
-			"result": "win",
-			"seed": 10,
-			"turns": 6
-		},
-		{
-			"actions": 7,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 17,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 0,
-			"result": "win",
-			"seed": 11,
-			"turns": 7
-		},
-		{
-			"actions": 9,
 			"allies": [
 				{
 					"alive": true,
@@ -624,15 +52,15 @@
 			],
 			"opportunity_hits": 1,
 			"result": "win",
-			"seed": 12,
+			"seed": 1,
 			"turns": 10
 		},
 		{
-			"actions": 6,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -640,7 +68,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 36,
+					"hp": 21,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -648,7 +76,579 @@
 				},
 				{
 					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 2,
+			"turns": 11
+		},
+		{
+			"actions": 11,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 21,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 3,
+			"turns": 11
+		},
+		{
+			"actions": 10,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 9,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 29,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 25,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 2,
+			"result": "win",
+			"seed": 4,
+			"turns": 10
+		},
+		{
+			"actions": 11,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 29,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 5,
+			"turns": 11
+		},
+		{
+			"actions": 12,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 21,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 6,
+			"turns": 12
+		},
+		{
+			"actions": 11,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 21,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 7,
+			"turns": 11
+		},
+		{
+			"actions": 10,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 21,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 1,
+			"result": "win",
+			"seed": 8,
+			"turns": 10
+		},
+		{
+			"actions": 12,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 14,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 16,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 1,
+			"result": "win",
+			"seed": 9,
+			"turns": 12
+		},
+		{
+			"actions": 12,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 21,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 10,
+			"turns": 12
+		},
+		{
+			"actions": 11,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 25,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 29,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 0,
+			"result": "win",
+			"seed": 11,
+			"turns": 11
+		},
+		{
+			"actions": 13,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
 					"hp": 8,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 10,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 2,
+			"result": "win",
+			"seed": 12,
+			"turns": 13
+		},
+		{
+			"actions": 11,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 23,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 21,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -677,14 +677,14 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 13,
-			"turns": 6
+			"turns": 11
 		},
 		{
-			"actions": 6,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -692,7 +692,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 28,
+					"hp": 21,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -700,7 +700,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 16,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -729,22 +729,22 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 14,
-			"turns": 6
+			"turns": 11
 		},
 		{
-			"actions": 7,
+			"actions": 15,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
 					"team": 0
 				},
 				{
-					"alive": true,
-					"hp": 28,
+					"alive": false,
+					"hp": 0,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -752,7 +752,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 8,
+					"hp": 16,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -778,17 +778,17 @@
 					"team": 1
 				}
 			],
-			"opportunity_hits": 0,
+			"opportunity_hits": 1,
 			"result": "win",
 			"seed": 15,
-			"turns": 7
+			"turns": 15
 		},
 		{
-			"actions": 9,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 14,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -804,7 +804,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 16,
+					"hp": 17,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -833,14 +833,14 @@
 			"opportunity_hits": 1,
 			"result": "win",
 			"seed": 16,
-			"turns": 10
+			"turns": 11
 		},
 		{
-			"actions": 7,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -848,7 +848,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 28,
+					"hp": 21,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -856,7 +856,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 16,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -885,14 +885,14 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 17,
-			"turns": 7
+			"turns": 11
 		},
 		{
-			"actions": 7,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 25,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -900,7 +900,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 28,
+					"hp": 21,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -908,7 +908,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 8,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -937,14 +937,14 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 18,
-			"turns": 7
+			"turns": 11
 		},
 		{
-			"actions": 11,
+			"actions": 10,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 13,
+					"hp": 9,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -952,7 +952,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 21,
+					"hp": 29,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -960,7 +960,59 @@
 				},
 				{
 					"alive": true,
-					"hp": 8,
+					"hp": 17,
+					"id": 2,
+					"max_hp": 33,
+					"name": "拳师",
+					"team": 0
+				}
+			],
+			"battle_id": "wuxia_b1",
+			"foes": [
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 3,
+					"max_hp": 25,
+					"name": "劫客甲",
+					"team": 1
+				},
+				{
+					"alive": false,
+					"hp": 0,
+					"id": 4,
+					"max_hp": 26,
+					"name": "劫客乙",
+					"team": 1
+				}
+			],
+			"opportunity_hits": 2,
+			"result": "win",
+			"seed": 19,
+			"turns": 10
+		},
+		{
+			"actions": 12,
+			"allies": [
+				{
+					"alive": true,
+					"hp": 17,
+					"id": 0,
+					"max_hp": 31,
+					"name": "剑客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 15,
+					"id": 1,
+					"max_hp": 36,
+					"name": "枪客",
+					"team": 0
+				},
+				{
+					"alive": true,
+					"hp": 10,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -988,15 +1040,15 @@
 			],
 			"opportunity_hits": 0,
 			"result": "win",
-			"seed": 19,
-			"turns": 11
+			"seed": 20,
+			"turns": 12
 		},
 		{
-			"actions": 9,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 23,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -1012,59 +1064,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 16,
-					"id": 2,
-					"max_hp": 33,
-					"name": "拳师",
-					"team": 0
-				}
-			],
-			"battle_id": "wuxia_b1",
-			"foes": [
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 3,
-					"max_hp": 25,
-					"name": "劫客甲",
-					"team": 1
-				},
-				{
-					"alive": false,
-					"hp": 0,
-					"id": 4,
-					"max_hp": 26,
-					"name": "劫客乙",
-					"team": 1
-				}
-			],
-			"opportunity_hits": 1,
-			"result": "win",
-			"seed": 20,
-			"turns": 10
-		},
-		{
-			"actions": 7,
-			"allies": [
-				{
-					"alive": true,
-					"hp": 22,
-					"id": 0,
-					"max_hp": 31,
-					"name": "剑客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 28,
-					"id": 1,
-					"max_hp": 36,
-					"name": "枪客",
-					"team": 0
-				},
-				{
-					"alive": true,
-					"hp": 8,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -1093,14 +1093,14 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 21,
-			"turns": 7
+			"turns": 11
 		},
 		{
-			"actions": 6,
+			"actions": 12,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 31,
+					"hp": 25,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -1108,7 +1108,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 28,
+					"hp": 8,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -1116,7 +1116,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 8,
+					"hp": 10,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -1145,14 +1145,14 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 22,
-			"turns": 6
+			"turns": 12
 		},
 		{
-			"actions": 7,
+			"actions": 12,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 17,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -1160,7 +1160,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 28,
+					"hp": 21,
 					"id": 1,
 					"max_hp": 36,
 					"name": "枪客",
@@ -1168,7 +1168,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 8,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -1197,14 +1197,14 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 23,
-			"turns": 7
+			"turns": 12
 		},
 		{
-			"actions": 9,
+			"actions": 11,
 			"allies": [
 				{
 					"alive": true,
-					"hp": 22,
+					"hp": 25,
 					"id": 0,
 					"max_hp": 31,
 					"name": "剑客",
@@ -1220,7 +1220,7 @@
 				},
 				{
 					"alive": true,
-					"hp": 8,
+					"hp": 24,
 					"id": 2,
 					"max_hp": 33,
 					"name": "拳师",
@@ -1249,7 +1249,7 @@
 			"opportunity_hits": 0,
 			"result": "win",
 			"seed": 24,
-			"turns": 9
+			"turns": 11
 		}
 	],
 	"samples": 24,
