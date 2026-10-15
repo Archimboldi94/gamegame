@@ -1,0 +1,4859 @@
+{
+  "说明": "固定种子1..24，B1首胜后原始装配的Lv2三人队；不训练、不学习新招、不精进、不完成B2。turns为单位行动次数，rounds为战斗轮次。双方单步贪心AI抽样，不代表真人胜率。 最终结果已复测后撤／击退入陷阱的统一结算。",
+  "before": {
+    "escort": {
+      "avg_rounds": 5.29166666666667,
+      "avg_turns": 26.875,
+      "battle_id": "wuxia_b3",
+      "losses": 24,
+      "party_profile": "after_b1",
+      "samples": 24,
+      "stance": "escort",
+      "timeouts": 0,
+      "win_rate": 0.0,
+      "wins": 0
+    },
+    "sect": {
+      "avg_rounds": 3.41666666666667,
+      "avg_turns": 18.5,
+      "battle_id": "wuxia_b3",
+      "losses": 24,
+      "party_profile": "after_b1",
+      "samples": 24,
+      "stance": "sect",
+      "timeouts": 0,
+      "win_rate": 0.0,
+      "wins": 0
+    }
+  },
+  "after": {
+    "escort": {
+      "avg_rounds": 7.45833333333333,
+      "avg_turns": 29.75,
+      "battle_id": "wuxia_b3",
+      "losses": 4,
+      "party_profile": "after_b1",
+      "rows": [
+        {
+          "actions": 19,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 28,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                4,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                9,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 4,
+          "seed": 1,
+          "stance": "escort",
+          "turns": 19
+        },
+        {
+          "actions": 32,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 9,
+          "seed": 2,
+          "stance": "escort",
+          "turns": 35
+        },
+        {
+          "actions": 40,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 6,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 8,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 11,
+          "seed": 3,
+          "stance": "escort",
+          "turns": 43
+        },
+        {
+          "actions": 19,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 25,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 6,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 4,
+          "stance": "escort",
+          "turns": 19
+        },
+        {
+          "actions": 23,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 5,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 2,
+          "result": "lose",
+          "rounds": 5,
+          "seed": 5,
+          "stance": "escort",
+          "turns": 24
+        },
+        {
+          "actions": 32,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                12
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 9,
+          "seed": 6,
+          "stance": "escort",
+          "turns": 35
+        },
+        {
+          "actions": 32,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 13,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 9,
+          "seed": 7,
+          "stance": "escort",
+          "turns": 35
+        },
+        {
+          "actions": 34,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 9,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                9
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                8
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 4,
+          "result": "win",
+          "rounds": 10,
+          "seed": 8,
+          "stance": "escort",
+          "turns": 35
+        },
+        {
+          "actions": 20,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 18,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 10,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                4,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 9,
+          "stance": "escort",
+          "turns": 20
+        },
+        {
+          "actions": 25,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                11
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 4,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 18,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 1,
+          "result": "lose",
+          "rounds": 5,
+          "seed": 10,
+          "stance": "escort",
+          "turns": 25
+        },
+        {
+          "actions": 31,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 19,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 9,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                11
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 9,
+          "seed": 11,
+          "stance": "escort",
+          "turns": 34
+        },
+        {
+          "actions": 26,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 11,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                3,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 13,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                4,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                3,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                4,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                11
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 5,
+          "result": "win",
+          "rounds": 6,
+          "seed": 12,
+          "stance": "escort",
+          "turns": 26
+        },
+        {
+          "actions": 29,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                4
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                5,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 8,
+          "seed": 13,
+          "stance": "escort",
+          "turns": 31
+        },
+        {
+          "actions": 32,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 9,
+          "seed": 14,
+          "stance": "escort",
+          "turns": 35
+        },
+        {
+          "actions": 29,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 4,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                4
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 16,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                5,
+                12
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 8,
+          "seed": 15,
+          "stance": "escort",
+          "turns": 32
+        },
+        {
+          "actions": 25,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 28,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                9,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                11
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 9,
+          "seed": 16,
+          "stance": "escort",
+          "turns": 26
+        },
+        {
+          "actions": 31,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                4,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                11
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 6,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 13,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                12
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 2,
+          "result": "lose",
+          "rounds": 6,
+          "seed": 17,
+          "stance": "escort",
+          "turns": 31
+        },
+        {
+          "actions": 28,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 19,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                4,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 4,
+          "result": "win",
+          "rounds": 9,
+          "seed": 18,
+          "stance": "escort",
+          "turns": 30
+        },
+        {
+          "actions": 25,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 19,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                11
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 10,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 9,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                4,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 15,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                11
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 5,
+          "seed": 19,
+          "stance": "escort",
+          "turns": 25
+        },
+        {
+          "actions": 26,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 19,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                5,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                11
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                3,
+                6
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                11
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 6,
+          "seed": 20,
+          "stance": "escort",
+          "turns": 26
+        },
+        {
+          "actions": 32,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 6,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 9,
+          "seed": 21,
+          "stance": "escort",
+          "turns": 35
+        },
+        {
+          "actions": 23,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                11
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 4,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 1,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 3,
+          "result": "lose",
+          "rounds": 5,
+          "seed": 22,
+          "stance": "escort",
+          "turns": 23
+        },
+        {
+          "actions": 27,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 11,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 10,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                2
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                11
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 8,
+          "seed": 23,
+          "stance": "escort",
+          "turns": 30
+        },
+        {
+          "actions": 38,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 5,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                9
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                4,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                4,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                6,
+                8
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 12,
+          "seed": 24,
+          "stance": "escort",
+          "turns": 40
+        }
+      ],
+      "samples": 24,
+      "stance": "escort",
+      "timeouts": 0,
+      "win_rate": 0.833333333333333,
+      "wins": 20
+    },
+    "sect": {
+      "avg_rounds": 4.45833333333333,
+      "avg_turns": 21.875,
+      "battle_id": "wuxia_b3",
+      "losses": 7,
+      "party_profile": "after_b1",
+      "rows": [
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 17,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 1,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 2,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 16,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 2,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 22,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 5,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 4,
+          "seed": 3,
+          "stance": "sect",
+          "turns": 22
+        },
+        {
+          "actions": 23,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 12,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 1,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                5,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 17,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                4,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 5,
+          "seed": 4,
+          "stance": "sect",
+          "turns": 23
+        },
+        {
+          "actions": 20,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 13,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 11,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 1,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 4,
+          "seed": 5,
+          "stance": "sect",
+          "turns": 20
+        },
+        {
+          "actions": 20,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 3,
+          "result": "lose",
+          "rounds": 4,
+          "seed": 6,
+          "stance": "sect",
+          "turns": 20
+        },
+        {
+          "actions": 23,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                6
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 16,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                9,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": false,
+          "opportunity_hits": 2,
+          "result": "lose",
+          "rounds": 5,
+          "seed": 7,
+          "stance": "sect",
+          "turns": 23
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 0,
+          "result": "win",
+          "rounds": 4,
+          "seed": 8,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 24,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                7,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                5,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 7,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 3,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                6
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 4,
+          "result": "lose",
+          "rounds": 5,
+          "seed": 9,
+          "stance": "sect",
+          "turns": 24
+        },
+        {
+          "actions": 20,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 13,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 3,
+          "result": "lose",
+          "rounds": 4,
+          "seed": 10,
+          "stance": "sect",
+          "turns": 20
+        },
+        {
+          "actions": 22,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                6,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                8,
+                6
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 5,
+          "seed": 11,
+          "stance": "sect",
+          "turns": 22
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 1,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 2,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                5,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 4,
+          "seed": 12,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 13,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 27,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                5,
+                10
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                7,
+                10
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 3,
+          "result": "lose",
+          "rounds": 6,
+          "seed": 14,
+          "stance": "sect",
+          "turns": 27
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 15,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 25,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                7,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 21,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 7,
+          "seed": 16,
+          "stance": "sect",
+          "turns": 26
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 17,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 7,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 13,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 4,
+          "seed": 18,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 20,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 22,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                6,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 2,
+          "result": "win",
+          "rounds": 5,
+          "seed": 19,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 24,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                7,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                5,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 7,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 17,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                6
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                10
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 3,
+          "result": "lose",
+          "rounds": 5,
+          "seed": 20,
+          "stance": "sect",
+          "turns": 24
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                6
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 16,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                8,
+                5
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 3,
+          "result": "win",
+          "rounds": 4,
+          "seed": 21,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 22,
+          "allies": [
+            {
+              "alive": true,
+              "hp": 2,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 1,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                6,
+                9
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 14,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                8,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 2,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                9
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 0,
+          "result": "win",
+          "rounds": 4,
+          "seed": 22,
+          "stance": "sect",
+          "turns": 22
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": true,
+              "hp": 21,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                3
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 17,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                7,
+                7
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": true,
+          "objective_taken": true,
+          "opportunity_hits": 1,
+          "result": "win",
+          "rounds": 4,
+          "seed": 23,
+          "stance": "sect",
+          "turns": 21
+        },
+        {
+          "actions": 21,
+          "allies": [
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 0,
+              "max_hp": 34,
+              "name": "剑客",
+              "position": [
+                8,
+                7
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 1,
+              "max_hp": 39,
+              "name": "枪客",
+              "position": [
+                7,
+                8
+              ],
+              "team": 0
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 2,
+              "max_hp": 36,
+              "name": "拳师",
+              "position": [
+                6,
+                7
+              ],
+              "team": 0
+            }
+          ],
+          "battle_id": "wuxia_b3",
+          "foes": [
+            {
+              "alive": true,
+              "hp": 5,
+              "id": 3,
+              "max_hp": 36,
+              "name": "废祠首领",
+              "position": [
+                7,
+                6
+              ],
+              "team": 1
+            },
+            {
+              "alive": true,
+              "hp": 26,
+              "id": 4,
+              "max_hp": 26,
+              "name": "枪卫",
+              "position": [
+                5,
+                8
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 5,
+              "max_hp": 22,
+              "name": "护卫甲",
+              "position": [
+                6,
+                10
+              ],
+              "team": 1
+            },
+            {
+              "alive": false,
+              "hp": 0,
+              "id": 6,
+              "max_hp": 22,
+              "name": "护卫乙",
+              "position": [
+                8,
+                9
+              ],
+              "team": 1
+            }
+          ],
+          "leader_fallen": false,
+          "objective_taken": false,
+          "opportunity_hits": 1,
+          "result": "lose",
+          "rounds": 4,
+          "seed": 24,
+          "stance": "sect",
+          "turns": 21
+        }
+      ],
+      "samples": 24,
+      "stance": "sect",
+      "timeouts": 0,
+      "win_rate": 0.708333333333333,
+      "wins": 17
+    }
+  }
+}

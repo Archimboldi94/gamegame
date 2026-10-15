@@ -13,6 +13,7 @@ var cell := Vector2i.ZERO
 var h := 0
 var terrain := "grass"
 var effect := ""
+var trap_spent := false
 var hl := Color(0, 0, 0, 0)
 var hl2 := Color(0, 0, 0, 0)
 var edge := Color(0, 0, 0, 0)  # outline-only highlight (attack reach beyond the move range)
@@ -109,9 +110,10 @@ func _draw_stele() -> void:
 
 
 func _draw_spikes() -> void:
+	var tip := -3.0 if trap_spent else -18.0
 	draw_colored_polygon(PackedVector2Array([
-		Vector2(-20, 8), Vector2(-10, -18), Vector2(0, 4), Vector2(10, -18), Vector2(20, 8)
-	]), Color(0.62, 0.28, 0.16, 0.95))
+		Vector2(-20, 8), Vector2(-10, tip), Vector2(0, 4), Vector2(10, tip), Vector2(20, 8)
+	]), Color(0.42, 0.43, 0.43, 0.7) if trap_spent else Color(0.62, 0.28, 0.16, 0.95))
 
 
 func _diamond(c: Color, s: float, outline := Color(0, 0, 0, 0)) -> void:
