@@ -49,6 +49,8 @@ func _run_all() -> void:
 		"test_party_weapon_compatibility_and_slots", "test_party_chapter_round_trip_and_migration",
 		"test_trait_youfeng", "test_trait_shouxian", "test_trait_tongmai",
 		"test_party_preparation_ui", "test_party_exploration_loadout",
+		"test_ai_avoids_pointless_zoc_exit", "test_ai_approach_prefers_safe_path",
+		"test_b1_autoplay_stats_batch",
 	]
 	for t in tests:
 		_current = t
@@ -2670,3 +2672,81 @@ func test_party_exploration_loadout() -> void:
 	game.shot = old_shot
 	game.current_battle = old_battle
 	game.exploration_battle = old_origin
+
+
+
+func test_ai_avoids_pointless_zoc_exit() -> void:
+	# Guard faces south; foe starts in the north control cell and can leave westward for free.
+	var guard := wuxia_unit(0, 0, Vector2i(4, 4))
+	guard.facing = 4 # south
+	guard.rp = 1
+	guard.atk = 20
+	guard.acc = 30
+	var foe := wuxia_unit(1, 1, Vector2i(4, 5))
+	foe.hp = 8
+	foe.max_hp = 8
+	foe.ap = 6
+	foe.eva = 0
+	foe.def = 0
+	# Bait south of the zone: walking south exits ZoC for almost no gain.
+	var bait := wuxia_unit(2, 0, Vector2i(4, 7))
+	bait.hp = 3
+	bait.max_hp = 3
+	bait.facing = 0
+	foe.spd = 99
+	var s := state_with(BattleMap.flat(10, 10), [guard, foe, bait])
+	s.current_id = foe.id
+	foe.ap = 6
+	foe.rp = 1
+	check(ControlZone.cells(guard, s.map).has(foe.pos), "foe starts inside guard ZoC")
+	var risky := EnemyAI.path_risk(s, foe, Vector2i(4, 6))
+	check(risky > 0.0, "leaving south accrues opportunity risk")
+	var plan := EnemyAI.plan(s, foe)
+	check(EnemyAI.path_risk(s, foe, plan["move"]) < risky or plan["move"] == foe.pos, "AI does not take the worse ZoC exit")
+	# West exit stays inside or leaves without walking through the lethal south step preference.
+	var chose_south_exit: bool = plan["move"].y > foe.pos.y and EnemyAI.path_risk(s, foe, plan["move"]) >= risky
+	check(not chose_south_exit, "AI refuses a strictly worse south ZoC exit")
+
+
+func test_ai_approach_prefers_safe_path() -> void:
+	# Guard faces south. Foe stands in the front ZoC cell with lethal opportunity damage.
+	var guard := wuxia_unit(0, 0, Vector2i(5, 5))
+	guard.facing = 4 # south
+	guard.rp = 1
+	guard.atk = 30
+	guard.acc = 50
+	var foe := wuxia_unit(1, 1, Vector2i(5, 6))
+	foe.hp = 5
+	foe.max_hp = 5
+	foe.ap = 6
+	foe.def = 0
+	foe.eva = 0
+	# Only ally is further south; walking there exits ZoC under the guard.
+	var goal := wuxia_unit(2, 0, Vector2i(5, 9))
+	goal.hp = 40
+	goal.max_hp = 40
+	var s := state_with(BattleMap.flat(12, 12), [guard, foe, goal])
+	s.current_id = foe.id
+	var reach := s.reachable_for(foe)
+	check(ControlZone.cells(guard, s.map).has(foe.pos), "foe starts inside south ZoC")
+	var direct := EnemyAI.path_risk(s, foe, Vector2i(5, 7), reach)
+	check(direct > 0.0, "leaving south accrues opportunity risk")
+	check(direct >= float(foe.hp), "fixture opportunity is lethal")
+	var pick := EnemyAI.approach_tile(s, foe, reach)
+	var pick_risk := EnemyAI.path_risk(s, foe, pick, reach)
+	check(pick_risk < float(foe.hp), "approach refuses a lethal ZoC exit")
+	eq(pick, foe.pos, "with only a lethal approach available, AI stays put")
+
+
+func test_b1_autoplay_stats_batch() -> void:
+	var one := BattleSim.run("wuxia_b1", 7, 250)
+	check(one["result"] in ["win", "lose", "timeout"], "single B1 sim returns a terminal result")
+	check(int(one["turns"]) > 0, "single B1 sim consumes turns")
+	var stats := BattleSim.batch("wuxia_b1", [1, 2, 3, 4, 5, 6, 7, 8], 300)
+	eq(stats["samples"], 8, "batch records sample count")
+	eq(int(stats["wins"]) + int(stats["losses"]) + int(stats["timeouts"]), 8, "batch partitions every seed")
+	check(float(stats["avg_turns"]) > 0.0, "batch reports average turns")
+	var summary := BattleSim.format_summary(stats)
+	check(summary.contains("SIM wuxia_b1") and summary.contains("win_rate="), "summary is machine-readable")
+	# Sanity: default B1 should usually resolve, not hang.
+	check(int(stats["timeouts"]) <= 2, "most default B1 seeds resolve within 300 turns")

@@ -28,6 +28,15 @@ godot --path . --resolution 1600x900 -- --shot=library --out=/workspace/art-slic
 godot --path . --resolution 1600x900 -- --shot=party --out=/workspace/art-slice/progress/party.png --frames=40
 ```
 
+
+## 自动试玩统计
+
+```bash
+godot --headless --path . -- --sim=wuxia_b1 --seeds=24 --sim-out=/tmp/b1_sim.json
+```
+
+双方 AI 在规则层对打，输出胜率与平均回合；默认种子 1..N。截图模式仍用 `--shot=wuxia`。
+
 ## 目录
 - `scripts/rules/` 规则与数据；`scripts/game/` 场景与表现；`scenes/` 场景
 - `data/wuxia/` B1 地图与战斗数据；`assets/` 运行时贴图；`audio/`、`fonts/`

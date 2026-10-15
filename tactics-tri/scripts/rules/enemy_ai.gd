@@ -3,6 +3,7 @@ extends RefCounted
 ## Greedy one-turn planner usable by either team: tries every reachable tile x usable action x
 ## target, scores expected damage (kills, back/side attacks and pincers weigh extra) or useful
 ## healing, and otherwise walks toward the closest opponent.
+## GDD path: expected ZoC opportunity damage is subtracted so AI avoids pointless zone exits.
 
 const HOLD_RADIUS := 6
 
@@ -12,11 +13,12 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 	var ends: Array = reach["ends"]
 	var foes := state.living(1 - u.team)
 	var best := {"score": 0.5, "move": u.pos, "skill": "", "target": Vector2i(-1, -1)}
-	var holding := u.ai == "hold" and _nearest_dist(u.pos, foes) > HOLD_RADIUS
+	var holding := u.ai == "hold" and _nearest_dist(u.pos, foes, u.use_gdd_rules) > HOLD_RADIUS
 	var candidates: Array = [u.pos] if holding else ends
 	var caution := (8.0 if u.is_lord else 1.5) * (2.0 - float(u.hp) / float(u.max_hp))
 	for tile in candidates:
-		var tile_bonus: float = state.map.get_h(tile) * 0.3 - threat_count(state, u, tile) * caution
+		var risk := path_risk(state, u, tile, reach)
+		var tile_bonus: float = state.map.get_h(tile) * 0.3 - threat_count(state, u, tile) * caution - risk * 1.25
 		if state.map.effect_at(tile) == "fire":
 			tile_bonus -= 8.0
 		for sid in u.all_actions():
@@ -31,14 +33,35 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 				if sc <= 0.0:
 					continue
 				sc += tile_bonus - float(sk["tp"]) * 1.5
+				# Only accept lethal ZoC risk when the attack itself is expected to finish the fight.
+				if risk >= float(u.hp) * 0.6 and sc < 30.0:
+					continue
 				if sc > float(best["score"]):
 					best = {"score": sc, "move": tile, "skill": sid, "target": t}
 	if best["skill"] == "" and not holding:
 		best["move"] = approach_tile(state, u, reach)
-		if u.tp >= 1 and u.skills.has("guard") and _nearest_dist(best["move"], foes) <= 2:
+		if u.tp >= 1 and u.skills.has("guard") and _nearest_dist(best["move"], foes, u.use_gdd_rules) <= 2:
 			best["skill"] = "guard"
 			best["target"] = best["move"]
 	return best
+
+
+## Expected opportunity damage along the cheapest reachable path to `to`.
+static func path_risk(state: BattleState, u: BattleUnit, to: Vector2i, reach: Dictionary = {}) -> float:
+	if not u.use_gdd_rules or to == u.pos:
+		return 0.0
+	var r: Dictionary = reach if not reach.is_empty() else state.reachable_for(u)
+	if not (r.get("ends", []) as Array).has(to):
+		return 0.0
+	var path := Pathing.path_to(r, u.pos, to)
+	var expected := 0.0
+	for e in state.path_reactions(u, path):
+		var p := float(e["hit"]) / 100.0
+		var dmg := mini(int(e["dmg"]), u.hp)
+		expected += float(dmg) * p
+		if int(e["dmg"]) >= u.hp:
+			expected += 50.0 * p
+	return expected
 
 
 static func _candidate_targets(state: BattleState, u: BattleUnit, sk: Dictionary, from: Vector2i) -> Array:
@@ -96,7 +119,7 @@ static func approach_tile(state: BattleState, u: BattleUnit, reach: Dictionary) 
 	var fallback := u.pos
 	var fallback_d := 1 << 30
 	for p in full["ends"]:
-		var d := _nearest_dist(p, foes)
+		var d := _nearest_dist(p, foes, u.use_gdd_rules)
 		var c: int = full["cost"][p]
 		if d <= 1 and c < goal_cost:
 			goal = p
@@ -114,6 +137,31 @@ static func approach_tile(state: BattleState, u: BattleUnit, reach: Dictionary) 
 			pick = p
 		elif not reach["cost"].has(p):
 			break
+	if not u.use_gdd_rules:
+		return pick
+	# Prefer a same-distance, lower-risk approach when the greedy path exits ZoC for nothing.
+	var best_d := _nearest_dist(pick, foes, true)
+	var best_risk := path_risk(state, u, pick, reach)
+	var best_cost: int = int(reach["cost"].get(pick, 0))
+	for tile in ends:
+		var d := _nearest_dist(tile, foes, true)
+		if d > best_d:
+			continue
+		var risk := path_risk(state, u, tile, reach)
+		var cost: int = int(reach["cost"][tile])
+		var better := false
+		if d < best_d:
+			better = risk < float(u.hp) # never prefer a closer lethal exit
+		elif risk + 0.01 < best_risk or (absf(risk - best_risk) < 0.01 and cost < best_cost):
+			better = true
+		if better:
+			pick = tile
+			best_d = d
+			best_risk = risk
+			best_cost = cost
+	# If every approach is lethal from opportunity, stay put.
+	if best_risk >= float(u.hp) and pick != u.pos:
+		return u.pos
 	return pick
 
 
@@ -128,13 +176,15 @@ static func threat_count(state: BattleState, u: BattleUnit, tile: Vector2i) -> i
 			var sk := SkillDB.get_skill(sid)
 			if sk["kind"] == "phys" or sk["kind"] == "mag":
 				r = maxi(r, int(sk["rmax"]))
-		if Pathing.manhattan(f.pos, tile) <= f.mov + r:
+		var dist := Pathing.chebyshev(f.pos, tile) if u.use_gdd_rules else Pathing.manhattan(f.pos, tile)
+		var reach: int = (f.max_ap if f.use_gdd_rules else f.mov) + r
+		if dist <= reach:
 			n += 1
 	return n
 
 
-static func _nearest_dist(p: Vector2i, foes: Array) -> int:
+static func _nearest_dist(p: Vector2i, foes: Array, gdd := false) -> int:
 	var best := 1 << 30
 	for f in foes:
-		best = mini(best, Pathing.manhattan(p, f.pos))
+		best = mini(best, Pathing.chebyshev(p, f.pos) if gdd else Pathing.manhattan(p, f.pos))
 	return best

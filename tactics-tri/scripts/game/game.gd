@@ -31,6 +31,9 @@ var shot := ""
 var shot_out := ""
 var shot_frames := 45
 var autoplay := ""  # --autoplay=<battle id>: AI plays both sides through the real battle scene, then quits
+var sim := ""  # --sim=<battle id>: headless both-sides AI batch, prints win-rate then quits
+var sim_seeds := 20
+var sim_out := ""
 var chapter := ChapterState.new()
 var chapter_loaded := false
 var exploration_battle: Dictionary = {}
@@ -44,6 +47,8 @@ func _ready() -> void:
 	_parse_args()
 	if shot != "":
 		_do_shot.call_deferred()
+	elif sim != "":
+		_run_sim.call_deferred()
 	elif autoplay != "":
 		current_battle = autoplay
 		_change.call_deferred("battle")
@@ -292,6 +297,12 @@ func _parse_args() -> void:
 			shot_frames = maxi(5, a.substr(9).to_int())
 		elif a.begins_with("--autoplay="):
 			autoplay = a.substr(11)
+		elif a.begins_with("--sim="):
+			sim = a.substr(6)
+		elif a.begins_with("--seeds="):
+			sim_seeds = maxi(1, a.substr(8).to_int())
+		elif a.begins_with("--sim-out="):
+			sim_out = a.substr(10)
 
 
 func _do_shot() -> void:
@@ -339,3 +350,19 @@ func _do_shot() -> void:
 	var err := img.save_png(path)
 	print("SHOT %s saved to %s (%dx%d) err=%d" % [shot, path, img.get_width(), img.get_height(), err])
 	get_tree().quit(0 if err == OK else 1)
+
+
+func _run_sim() -> void:
+	var seeds: Array = []
+	for i in sim_seeds:
+		seeds.append(i + 1)
+	var stats := BattleSim.batch(sim, seeds)
+	print(BattleSim.format_summary(stats))
+	if sim_out != "":
+		var path := sim_out if sim_out.is_absolute_path() else ProjectSettings.globalize_path("res://").path_join(sim_out)
+		DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+		var f := FileAccess.open(path, FileAccess.WRITE)
+		if f:
+			f.store_string(JSON.stringify(stats, "\t"))
+			print("SIM wrote %s" % path)
+	get_tree().quit(0 if int(stats["timeouts"]) == 0 else 1)
