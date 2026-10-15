@@ -21,7 +21,9 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 			tile_bonus -= 8.0
 		for sid in u.all_actions():
 			var sk := SkillDB.get_skill(sid)
-			if sk["kind"] == "self" or int(sk["tp"]) > u.tp:
+			if sk["kind"] == "self" or sk["kind"] == "move" or not state.skill_usable(u, sid):
+				continue
+			if u.use_gdd_rules and int(reach["cost"][tile]) + int(sk.get("ap", 0)) > u.ap:
 				continue
 			for t in _candidate_targets(state, u, sk, tile):
 				var entries := state.preview(u, sid, t, tile)
@@ -47,7 +49,7 @@ static func _candidate_targets(state: BattleState, u: BattleUnit, sk: Dictionary
 	for o in state.units:
 		if not o.alive() or (o.team == u.team) != wants_ally:
 			continue
-		if Pathing.manhattan(o.pos, from) <= reach:
+		if (Pathing.chebyshev(o.pos, from) if u.use_gdd_rules else Pathing.manhattan(o.pos, from)) <= reach:
 			near_unit = true
 			break
 	if not near_unit:

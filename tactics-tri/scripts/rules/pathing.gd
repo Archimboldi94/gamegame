@@ -94,6 +94,42 @@ static func path_to(result: Dictionary, start: Vector2i, goal: Vector2i) -> Arra
 	return path
 
 
+## Lightfoot pays a fixed skill cost; distance counts steps, not terrain AP.
+## Low obstacles may be crossed by Yanxing, but are never valid landings.
+static func lightfoot_search(map: BattleMap, unit: BattleUnit, units: Array, from: Vector2i, distance: int, cross_low: bool) -> Dictionary:
+	var occupied := {}
+	for other in units:
+		if other != unit and other.alive():
+			occupied[other.pos] = true
+	var cost := {from: 0}
+	var prev := {}
+	var queue: Array = [from]
+	var ends := []
+	while not queue.is_empty():
+		var p: Vector2i = queue.pop_front()
+		if p != from and map.is_passable(p, unit.flying):
+			ends.append(p)
+		if int(cost[p]) >= distance:
+			continue
+		for d in BattleMap.DIRS:
+			var next: Vector2i = p + d
+			if cost.has(next) or occupied.has(next) or not _lightfoot_passable(map, next, unit.flying, cross_low):
+				continue
+			if cross_low:
+				if d.x != 0 and d.y != 0 and not _lightfoot_passable(map, p + Vector2i(d.x, 0), unit.flying, true) and not _lightfoot_passable(map, p + Vector2i(0, d.y), unit.flying, true):
+					continue
+			elif enter_cost(map, unit.jump, p, next, unit.flying) < 0:
+				continue
+			cost[next] = int(cost[p]) + 1
+			prev[next] = p
+			queue.append(next)
+	return {"cost": cost, "prev": prev, "ends": ends}
+
+
+static func _lightfoot_passable(map: BattleMap, p: Vector2i, flying: bool, cross_low: bool) -> bool:
+	return map.in_bounds(p) and (map.is_passable(p, flying) or (cross_low and bool(Terrain.info(map.get_terrain(p)).get("leap_over", false))))
+
+
 static func manhattan(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
 

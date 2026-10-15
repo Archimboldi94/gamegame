@@ -30,6 +30,14 @@ func _run_all() -> void:
 		"test_expanded_tile_edges_and_ground_gaps", "test_battle_hud_and_ground_toggle",
 		"test_wuxia_eight_dir_and_corner", "test_wuxia_ap_and_neili",
 		"test_wuxia_control_zone_and_counter", "test_wuxia_b1_setup",
+		"test_wuxia_loadouts_and_costs", "test_wuxia_resource_submission_atomicity",
+		"test_wuxia_rest_and_inner_start", "test_wuxia_seal_lifecycle",
+		"test_wuxia_guard_and_cangsong", "test_wuxia_block_exclusive_and_consumption",
+		"test_wuxia_line_and_arc_geometry", "test_wuxia_knockback_legality",
+		"test_wuxia_misses_skip_effects", "test_wuxia_lightfoot_paths_and_limits",
+		"test_wuxia_lightfoot_opportunities", "test_wuxia_retreat_once_and_reactions",
+		"test_wuxia_movement_cost_and_action_combos", "test_wuxia_ai_resource_and_active_skills",
+		"test_wuxia_hud_skill_availability",
 	]
 	for t in tests:
 		_current = t
@@ -1110,3 +1118,545 @@ func test_wuxia_b1_setup() -> void:
 	for u in s.units:
 		names.append(u.name)
 	check(names.has("剑客") and names.has("劫客甲"), "named cast loaded")
+
+
+# GDD 4.4–4.7 / 6.4: deterministic B1 martial-art acceptance tests.
+func wuxia_unit(id: int, team: int, pos: Vector2i) -> BattleUnit:
+	var u := BattleUnit.new()
+	u.id = id
+	u.name = "武者%d" % id
+	u.use_gdd_rules = true
+	u.team = team
+	u.pos = pos
+	u.hp = 100
+	u.max_hp = 100
+	u.atk = 4
+	u.spd = 60 - id
+	u.basic = "普攻"
+	u.skills = ["破风剑", "回锋剑", "横江刀", "震山掌", "截脉指", "守关式", "燕行步", "踏雪步", "防御", "调息"]
+	return u
+
+
+func force_next_wuxia_miss(s: BattleState) -> void:
+	# Pick a seed whose next roll exceeds even the 95% hit cap.
+	var probe := RandomNumberGenerator.new()
+	for seed_value in range(10000):
+		probe.seed = seed_value
+		if probe.randi_range(1, 100) > 95:
+			s.rng.seed = seed_value
+			s.always_hit = false
+			return
+	check(false, "a deterministic miss seed exists")
+
+
+func event_count(events: Array, kind: String) -> int:
+	var count := 0
+	for e in events:
+		if e["type"] == kind:
+			count += 1
+	return count
+
+
+func test_wuxia_loadouts_and_costs() -> void:
+	var s := BattleDefs.build_wuxia_b1()
+	var raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_combat.json"))
+	var seen := {}
+	var seen_inners := {}
+	var seen_lightfoot := {}
+	for u in s.living(BattleUnit.PLAYER):
+		eq(u.active_skills.size(), 3, "B1 has three active slots")
+		eq(u.active_skills, raw["units"][u.id]["skills"], "active slots loaded from JSON")
+		eq(u.inner, raw["units"][u.id]["inner"], "inner slot loaded from JSON")
+		eq(u.lightfoot, raw["units"][u.id]["lightfoot"], "lightfoot slot loaded from JSON")
+		check(not SkillDB.get_inner(u.inner).is_empty(), "inner has data")
+		check(u.skills.has(u.lightfoot) and not u.skills.has(u.inner), "lightfoot is usable and inner is passive")
+		eq(u.all_actions().size(), 7, "three active + lightfoot + basic/rest/block")
+		for sid in u.active_skills:
+			seen[sid] = true
+		seen_inners[u.inner] = true
+		seen_lightfoot[u.lightfoot] = true
+	for sid in ["破风剑", "回锋剑", "横江刀", "震山掌", "截脉指", "守关式"]:
+		check(seen.has(sid), "B1 exposes active " + sid)
+	eq(seen_inners.size(), 2, "both inners equipped")
+	eq(seen_lightfoot.size(), 2, "both lightfoot arts equipped")
+	eq(s.units[0].weapon, "sword", "sword loadout")
+	eq(s.units[1].weapon, "spear", "spear loadout")
+	eq(s.units[2].weapon, "fist", "fist loadout")
+	var costs := {"破风剑": [4, 3], "回锋剑": [3, 2], "横江刀": [4, 3], "震山掌": [4, 3], "截脉指": [4, 4], "守关式": [2, 2], "燕行步": [2, 4], "踏雪步": [2, 3], "防御": [2, 0], "调息": [3, 0]}
+	for sid in costs:
+		var sk := SkillDB.get_skill(sid)
+		eq([int(sk["ap"]), int(sk["qi"])], costs[sid], "GDD costs " + sid)
+	eq(int(SkillDB.get_skill("截脉指")["rmax"]), 1, "seal is adjacent only")
+
+
+func test_wuxia_resource_submission_atomicity() -> void:
+	# GDD 6.4 #3: every command rejects insufficient resources before all mutations.
+	for sid in ["普攻", "破风剑", "回锋剑", "横江刀", "震山掌", "截脉指", "守关式", "燕行步", "踏雪步", "防御", "调息"]:
+		var u := wuxia_unit(0, 0, Vector2i(2, 2))
+		var t := wuxia_unit(1, 1, Vector2i(3, 2))
+		var s := state_with(BattleMap.flat(7, 7), [u, t])
+		var sk := SkillDB.get_skill(sid)
+		var tile := u.pos if sk["shape"] == "self" else (Vector2i(2, 3) if sk["shape"] == "leap" else t.pos)
+		for resource in ["ap", "qi"]:
+			if int(sk.get(resource, 0)) == 0:
+				continue
+			u.ap = 6
+			u.qi = 12
+			u.set(resource, int(sk[resource]) - 1)
+			var snapshot := [u.ap, u.qi, u.pos, u.facing, t.hp, s.acted, u.used_skills.duplicate()]
+			check(not s.skill_usable(u, sid), sid + " insufficient " + resource)
+			check(not s.is_valid_target(u, sid, tile), sid + " cannot submit " + resource)
+			eq(s.execute(u, sid, tile), [], sid + " no events on rejection")
+			eq([u.ap, u.qi, u.pos, u.facing, t.hp, s.acted, u.used_skills], snapshot, sid + " rejection leaves state intact")
+	var a := wuxia_unit(0, 0, Vector2i(1, 1))
+	var state := state_with(BattleMap.flat(3, 3), [a])
+	for bad in [Vector2i(-1, 1), Vector2i(8, 8), a.pos]:
+		eq(state.execute(a, "燕行步", bad), [], "invalid leap rejected before payment")
+	eq([a.ap, a.qi, state.acted, a.used_skills.size()], [6, 12, false, 0], "invalid landings consume nothing")
+	a.skills.erase("守关式")
+	check(not state.skill_usable(a, "守关式"), "unequipped art cannot be submitted")
+	eq(state.execute(a, "守关式", a.pos), [], "unequipped art cannot be executed")
+
+
+func test_wuxia_rest_and_inner_start() -> void:
+	# GDD 6.4 #4: rest is once per own action, even at cap; resets next action.
+	var u := wuxia_unit(0, 0, Vector2i(1, 1))
+	u.inner = "归元诀"
+	var s := state_with(BattleMap.flat(3, 3), [u])
+	u.qi = 3
+	s.begin_next_turn()
+	eq(u.qi, 5, "Guiyuan adds one beyond base recovery")
+	s.execute(u, "调息", u.pos)
+	eq([u.ap, u.qi], [3, 9], "rest costs 3 AP and restores 4 qi")
+	check(not s.skill_usable(u, "调息"), "rest disabled after use")
+	eq(s.execute(u, "调息", u.pos), [], "second rest rejected")
+	eq([u.ap, u.qi], [3, 9], "second rest consumes nothing")
+	s.end_turn()
+	s.begin_next_turn()
+	check(s.skill_usable(u, "调息"), "rest resets on own next action")
+	s.execute(u, "调息", u.pos)
+	eq(u.qi, 12, "rest does not exceed cap")
+	s.end_turn()
+	s.begin_next_turn()
+	eq(u.qi, 12, "Guiyuan recovery does not exceed cap")
+	s.execute(u, "调息", u.pos)
+	eq(u.ap, 3, "rest at cap still costs AP")
+	check(not s.skill_usable(u, "调息"), "rest at cap still consumes its one use")
+	u.inner = ""
+	u.qi = 0
+	s.end_turn()
+	s.begin_next_turn()
+	eq(u.qi, 1, "base recovery without inner is exactly one")
+
+
+func test_wuxia_seal_lifecycle() -> void:
+	# GDD 6.4 #5: pending penalty does not stack; active status clears at action end.
+	var a := wuxia_unit(0, 0, Vector2i(2, 2))
+	var b := wuxia_unit(1, 1, Vector2i(3, 2))
+	b.rp = 0
+	var s := state_with(BattleMap.flat(5, 5), [a, b])
+	s.begin_next_turn()
+	s.execute(a, "截脉指", b.pos)
+	eq(b.ap_penalty, 2, "hit queues -2 AP")
+	eq(b.ap, 6, "seal does not reduce current AP")
+	a.ap = 6
+	s.execute(a, "截脉指", b.pos)
+	eq(b.ap_penalty, 2, "repeated seal does not stack")
+	s.end_turn()
+	eq(s.begin_next_turn()["unit"], b, "target obtains own action")
+	eq(b.ap, 4, "next own action has 4 AP")
+	check(b.qi_blocked, "seal remains visible throughout affected action")
+	eq(b.ap_penalty, 0, "pending penalty consumed once")
+	s.end_turn()
+	check(not b.qi_blocked, "seal clears at affected action end")
+	s.begin_next_turn()
+	s.end_turn()
+	s.begin_next_turn()
+	eq(b.ap, 6, "subsequent action restores full AP")
+	check(not b.qi_blocked, "seal does not persist into another action")
+
+
+func test_wuxia_guard_and_cangsong() -> void:
+	# GDD 6.4 #6: repeated sources retain one layer and expire only on owner's start.
+	var a := wuxia_unit(0, 0, Vector2i(2, 2))
+	var b := wuxia_unit(1, 1, Vector2i(3, 2))
+	var s := state_with(BattleMap.flat(5, 5), [a, b])
+	a.inner = "苍松功"
+	s.begin_next_turn()
+	s.execute(a, "守关式", a.pos)
+	s.execute(a, "守关式", a.pos)
+	eq(a.ap, 2, "two guard casts leave exactly 2 AP")
+	s.end_turn()
+	check(a.guard and a.used_skills.get("inner_end", false), "Cangsong triggers at exactly 2 AP")
+	s.begin_next_turn()
+	check(a.guard, "another unit's start does not expire guard")
+	var expected := Combat.gdd_calc(b, a, SkillDB.get_skill("普攻"), s.map, b.pos)
+	eq(expected["dmg"], 9, "multiple guard sources only reduce 12 damage to 9")
+	a.rp = 0
+	var hp := a.hp
+	s.execute(b, "普攻", a.pos)
+	eq(hp - a.hp, 9, "guard reduces the next hit by 25 percent")
+	check(not a.guard, "guard consumed after one hit")
+	hp = a.hp
+	s.execute(b, "普攻", a.pos)
+	eq(hp - a.hp, 12, "next hit receives full damage")
+	a.gain_guard()
+	s.end_turn()
+	s.begin_next_turn()
+	check(not a.guard, "unused guard expires at owner's next start")
+	a.ap = 1
+	s.end_turn()
+	check(not a.guard, "Cangsong does not trigger below 2 AP")
+	s.end_turn()
+	check(not a.guard, "duplicate end_turn has no effect")
+
+
+func test_wuxia_block_exclusive_and_consumption() -> void:
+	# GDD 6.4 #21: basic block is 2AP/0qi, +2 armor for one hit, exclusive with guard.
+	var a := wuxia_unit(0, 0, Vector2i(2, 2))
+	var b := wuxia_unit(1, 1, Vector2i(3, 2))
+	var s := state_with(BattleMap.flat(5, 5), [a, b])
+	a.qi = 0
+	s.execute(a, "防御", a.pos)
+	eq([a.ap, a.qi], [4, 0], "basic block costs only 2 AP")
+	check(a.block and not a.guard, "basic defense grants block")
+	eq(Combat.gdd_calc(b, a, SkillDB.get_skill("普攻"), s.map, b.pos)["dmg"], 10, "block adds exactly 2 armor")
+	a.rp = 0
+	force_next_wuxia_miss(s)
+	s.execute(b, "普攻", a.pos)
+	check(a.block, "miss does not consume block")
+	b.ap = 6
+	s.always_hit = true
+	var hp := a.hp
+	s.execute(b, "普攻", a.pos)
+	eq(hp - a.hp, 10, "block applies to one hit")
+	check(not a.block, "block removed after effective hit")
+	hp = a.hp
+	s.execute(b, "普攻", a.pos)
+	eq(hp - a.hp, 12, "second hit has no block armor")
+	a.ap = 6
+	a.qi = 12
+	s.execute(a, "守关式", a.pos)
+	s.execute(a, "防御", a.pos)
+	check(a.block and not a.guard, "later block replaces guard")
+	s.execute(a, "守关式", a.pos)
+	check(a.guard and not a.block, "later guard replaces block")
+	eq(Combat.gdd_calc(b, a, SkillDB.get_skill("普攻"), s.map, b.pos)["dmg"], 9, "guard does not also gain block armor")
+	a.gain_block()
+	s.begin_next_turn()
+	check(not a.block, "unused block expires on own start")
+	a.gain_block()
+	a.inner = "苍松功"
+	s.end_turn()
+	check(a.guard and not a.block, "Cangsong replaces block with one guard")
+
+
+func test_wuxia_line_and_arc_geometry() -> void:
+	# GDD 6.4 #7: line preview and execution both stop at walls, in all eight axes.
+	for facing in range(8):
+		var m := BattleMap.flat(11, 11)
+		var a := wuxia_unit(0, 0, Vector2i(5, 5))
+		var d: Vector2i = BattleMap.DIRS[facing]
+		var near := wuxia_unit(1, 1, a.pos + d)
+		var far := wuxia_unit(2, 1, a.pos + d * 3)
+		var s := state_with(m, [a, near, far])
+		m.set_terrain(a.pos + d * 2, "wall")
+		eq(s.preview(a, "破风剑", near.pos).size(), 1, "wall removes targets behind line " + str(facing))
+		check(not s.target_tiles(a, "破风剑", a.pos).has(far.pos), "range excludes behind-wall line target")
+		s.execute(a, "破风剑", near.pos)
+		check(near.hp < 100, "line hits before wall")
+		eq(far.hp, 100, "line cannot hit through wall")
+		m.set_terrain(a.pos + d * 2, "grass")
+		a.ap = 6
+		eq(s.preview(a, "破风剑", near.pos).size(), 2, "line reaches multiple targets without wall")
+		var sk := SkillDB.get_skill("横江刀")
+		var arc := Combat.affected_tiles(sk, a.pos, a.pos + d, m)
+		var expected: Array = []
+		for offset in [-1, 0, 1]:
+			expected.append(a.pos + BattleMap.DIRS[posmod(facing + offset, 8)])
+		eq(arc, expected, "sweep covers three consecutive neighbors for facing " + str(facing))
+	# All three legal enemies are hit; an ally and rear enemy are excluded.
+	var a := wuxia_unit(0, 0, Vector2i(3, 3))
+	var units: Array = [a]
+	for i in range(8):
+		units.append(wuxia_unit(i + 1, 1, a.pos + BattleMap.DIRS[i]))
+	var s := state_with(BattleMap.flat(7, 7), units)
+	var ev := s.execute(a, "横江刀", a.pos + BattleMap.DIRS[0])
+	eq(event_count(ev, "damage"), 3, "sweep hits all three front targets")
+	eq(event_count(ev, "counter"), 0, "sweep has no single-target counters")
+	for i in range(8):
+		eq(units[i + 1].hp < 100, i in [7, 0, 1], "sweep only damages its arc")
+	units[8].team = 0
+	a.ap = 6
+	a.qi = 12
+	eq(s.preview(a, "横江刀", a.pos + BattleMap.DIRS[0]).size(), 2, "sweep excludes friendly units")
+	s.map.set_terrain(a.pos + BattleMap.DIRS[1], "wall")
+	eq(s.preview(a, "横江刀", a.pos + BattleMap.DIRS[0]).size(), 1, "sweep excludes obstructed neighbor")
+
+
+func test_wuxia_knockback_legality() -> void:
+	# GDD 6.4 #7: invalid forced landing causes only base damage, never collision damage.
+	for block_kind in ["wall", "crate", "water", "occupied", "edge", "corner", "legal", "diagonal"]:
+		var a := wuxia_unit(0, 0, Vector2i(1, 1))
+		var b := wuxia_unit(1, 1, Vector2i(2, 1))
+		var m := BattleMap.flat(5, 5)
+		var units: Array = [a, b]
+		var dest := Vector2i(3, 1)
+		if block_kind in ["diagonal", "corner"]:
+			b.pos = Vector2i(2, 2)
+			dest = Vector2i(3, 3)
+		if block_kind == "edge":
+			a.pos = Vector2i(3, 1)
+			b.pos = Vector2i(4, 1)
+		elif block_kind == "occupied":
+			units.append(wuxia_unit(2, 1, dest))
+		elif block_kind == "corner":
+			m.set_terrain(Vector2i(3, 2), "wall")
+			m.set_terrain(Vector2i(2, 3), "wall")
+		elif block_kind in ["wall", "crate", "water"]:
+			m.set_terrain(dest, block_kind)
+		var origin := b.pos
+		var s := state_with(m, units)
+		b.rp = 0
+		var ev := s.execute(a, "震山掌", b.pos)
+		eq(b.hp, 88, block_kind + " only base damage, no collision or falling damage")
+		eq(b.pos, dest if block_kind in ["legal", "diagonal"] else origin, block_kind + " legal forced landing")
+		eq(event_count(ev, "collide"), 0, "GDD push never creates collide damage")
+		eq(event_count(ev, "opportunity"), 0, "forced displacement never triggers leaving reaction")
+
+
+func test_wuxia_misses_skip_effects() -> void:
+	for sid in ["震山掌", "截脉指", "破风剑"]:
+		var a := wuxia_unit(0, 0, Vector2i(2, 2))
+		var b := wuxia_unit(1, 1, Vector2i(3, 2))
+		b.gain_guard()
+		b.rp = 0
+		var s := state_with(BattleMap.flat(6, 6), [a, b])
+		force_next_wuxia_miss(s)
+		var ev := s.execute(a, sid, b.pos)
+		eq(event_count(ev, "miss"), 1, sid + " deterministic miss")
+		eq([b.hp, b.pos, b.ap_penalty, b.guard], [100, Vector2i(3, 2), 0, true], sid + " miss has no damage/push/seal/guard consumption")
+		var sk := SkillDB.get_skill(sid)
+		eq([a.ap, a.qi], [6 - int(sk["ap"]), 12 - int(sk["qi"])], sid + " misses still pay declared costs")
+
+
+func test_wuxia_lightfoot_paths_and_limits() -> void:
+	# GDD 6.4 #2: Yanxing crosses low barriers; neither art crosses a complete wall.
+	for obstacle in ["crate", "low_wall", "gap", "water", "wall"]:
+		var m := BattleMap.flat(5, 5)
+		for y in range(5):
+			m.set_terrain(Vector2i(2, y), obstacle)
+		var a := wuxia_unit(0, 0, Vector2i(1, 2))
+		var s := state_with(m, [a])
+		var landing := Vector2i(3, 2)
+		eq(s.is_valid_target(a, "燕行步", landing), obstacle != "wall", "Yanxing crossing " + obstacle)
+		check(not s.is_valid_target(a, "踏雪步", landing), "Taxue cannot cross " + obstacle)
+		check(not s.is_valid_target(a, "燕行步", Vector2i(2, 2)), "cannot land on " + obstacle)
+		if obstacle == "wall":
+			eq(s.execute(a, "燕行步", landing), [], "cannot submit leap through wall")
+			eq([a.ap, a.qi], [6, 12], "blocked leap costs nothing")
+		else:
+			s.execute(a, "燕行步", landing)
+			eq(a.pos, landing, "Yanxing lands across low barrier")
+			eq([a.ap, a.qi], [4, 8], "Yanxing pays flat 2AP/4qi")
+	# Full wall corner is sealed even when the desired landing is walkable.
+	var m := BattleMap.flat(4, 4)
+	m.set_terrain(Vector2i(1, 0), "wall")
+	m.set_terrain(Vector2i(0, 1), "wall")
+	var a := wuxia_unit(0, 0, Vector2i.ZERO)
+	var s := state_with(m, [a])
+	check(not s.is_valid_target(a, "燕行步", Vector2i(1, 1)), "Yanxing cannot cut sealed wall corner")
+	for sid in ["燕行步", "踏雪步"]:
+		var u := wuxia_unit(0, 0, Vector2i(3, 3))
+		var state := state_with(BattleMap.flat(9, 9), [u])
+		state.begin_next_turn()
+		var distance := 3 if sid == "燕行步" else 2
+		var dest := u.pos + Vector2i(distance, distance)
+		check(state.target_tiles(u, sid, u.pos).has(dest), sid + " reaches diagonal Chebyshev limit")
+		check(not state.target_tiles(u, sid, u.pos).has(u.pos + Vector2i(distance + 1, 0)), sid + " excludes beyond range")
+		var ev := state.execute(u, sid, dest)
+		eq(u.pos, dest, sid + " reaches selected landing")
+		eq(u.ap, 4, sid + " distance adds no per-cell AP")
+		eq(u.guard, sid == "踏雪步", sid + " landing guard only for Taxue")
+		eq(event_count(ev, "leap"), distance, sid + " exposes traversed path for animation")
+		check(not state.skill_usable(u, sid), sid + " once per action")
+		eq(state.execute(u, sid, Vector2i(3, 3)), [], sid + " repeat cannot be submitted")
+		state.end_turn()
+		state.begin_next_turn()
+		check(state.skill_usable(u, sid), sid + " use resets next action")
+		check(not u.guard, sid + " unused guard expires on own next action")
+	# Occupied intermediate and landing cells cannot be traversed or targeted.
+	var u := wuxia_unit(0, 0, Vector2i(0, 0))
+	var blocker := wuxia_unit(1, 0, Vector2i(1, 0))
+	var state := state_with(BattleMap.flat(4, 1), [u, blocker])
+	for sid in ["燕行步", "踏雪步"]:
+		check(not state.is_valid_target(u, sid, blocker.pos), sid + " occupied landing excluded")
+		check(not state.is_valid_target(u, sid, Vector2i(2, 0)), sid + " occupied corridor blocked")
+
+
+func test_wuxia_lightfoot_opportunities() -> void:
+	# GDD 6.4 #14: Yanxing is exempt; Taxue settles opportunity BEFORE landing guard.
+	for sid in ["燕行步", "踏雪步"]:
+		var a := wuxia_unit(0, 0, Vector2i(2, 2))
+		var b := wuxia_unit(1, 1, Vector2i(2, 1))
+		b.facing = 4
+		var s := state_with(BattleMap.flat(6, 6), [a, b])
+		var ev := s.execute(a, sid, Vector2i(2, 4))
+		var immune: bool = sid == "燕行步"
+		eq(event_count(ev, "opportunity"), 0 if immune else 1, sid + " declared opportunity rule")
+		eq(b.rp, 1 if immune else 0, sid + " reactor RP")
+		eq(a.hp, 100 if immune else 88, sid + " reaction is before landing guard")
+		eq(a.pos, Vector2i(2, 4), sid + " completes displacement")
+		eq(a.guard, not immune, sid + " Taxue gains guard after landing")
+	var a := wuxia_unit(0, 0, Vector2i(2, 2))
+	var b := wuxia_unit(1, 1, Vector2i(2, 1))
+	b.facing = 4
+	a.hp = 1
+	var s := state_with(BattleMap.flat(6, 6), [a, b])
+	var ev := s.execute(a, "踏雪步", Vector2i(2, 4))
+	check(not a.alive(), "lethal opportunity defeats Taxue mover")
+	eq(a.pos, Vector2i(2, 2), "lethal opportunity stops before departing")
+	check(not a.guard, "interrupted Taxue does not receive landing guard")
+	eq([a.ap, a.qi], [4, 9], "submitted interrupted Taxue still pays fixed cost")
+	eq(event_count(ev, "leap"), 0, "dead mover has no movement playback")
+
+
+func test_wuxia_retreat_once_and_reactions() -> void:
+	var a := wuxia_unit(0, 0, Vector2i(3, 3))
+	var b := wuxia_unit(1, 1, Vector2i(4, 3))
+	b.facing = 6
+	var s := state_with(BattleMap.flat(8, 8), [a, b])
+	s.begin_next_turn()
+	var ev := s.execute(a, "回锋剑", b.pos)
+	eq(a.pos, Vector2i(2, 3), "Huifeng retreats one adjacent tile")
+	eq([a.ap, a.qi], [3, 10], "retreat adds no AP/qi cost")
+	eq(event_count(ev, "opportunity"), 1, "Huifeng retreat is not implicitly safe")
+	eq(event_count(ev, "counter"), 0, "retreat out of range prevents later counter")
+	b.pos = Vector2i(3, 3)
+	s.execute(a, "回锋剑", b.pos)
+	eq(a.pos, Vector2i(2, 3), "second attack does not retreat again")
+	s.end_turn()
+	s.begin_next_turn()
+	s.end_turn()
+	s.begin_next_turn()
+	eq(a.used_skills.size(), 0, "retreat usage resets at own action start")
+	b.rp = 0
+	s.map.set_terrain(Vector2i(1, 3), "wall")
+	ev = s.execute(a, "回锋剑", b.pos)
+	eq(a.pos, Vector2i(2, 3), "retreat cannot enter blocked landing")
+	eq(event_count(ev, "damage"), 1, "blocked retreat still attacks normally")
+
+
+func test_wuxia_movement_cost_and_action_combos() -> void:
+	var m := BattleMap.flat(6, 4)
+	var a := wuxia_unit(0, 0, Vector2i(1, 1))
+	var b := wuxia_unit(1, 1, Vector2i(3, 2))
+	b.rp = 0
+	var s := state_with(m, [a, b])
+	s.begin_next_turn()
+	m.set_terrain(Vector2i(2, 2), "mud")
+	s.move_unit(a, Vector2i(2, 2))
+	eq(a.ap, 4, "GDD #2 mud costs 2 AP")
+	s.execute(a, "普攻", b.pos)
+	eq(a.ap, 1, "attack can follow movement")
+	s.move_unit(a, Vector2i(1, 2))
+	eq(a.ap, 0, "movement can follow attack in same action")
+	eq(a.pos, Vector2i(1, 2), "move/attack/move reaches final tile")
+
+
+func test_wuxia_ai_resource_and_active_skills() -> void:
+	var a := wuxia_unit(0, 1, Vector2i(3, 3))
+	a.skills = ["横江刀"]
+	var b := wuxia_unit(1, 0, Vector2i(3, 2))
+	var c := wuxia_unit(2, 0, Vector2i(4, 2))
+	var d := wuxia_unit(3, 0, Vector2i(2, 2))
+	var s := state_with(BattleMap.flat(7, 7), [a, b, c, d])
+	var plan := EnemyAI.plan(s, a)
+	eq(plan["skill"], "横江刀", "AI chooses active sweep against grouped foes")
+	var move_cost := int(s.reachable_for(a)["cost"][plan["move"]])
+	check(move_cost + 4 <= a.ap, "AI reserves AP for selected art")
+	s.move_unit(a, plan["move"])
+	check(s.is_valid_target(a, plan["skill"], plan["target"]), "AI action valid after movement")
+	check(not s.execute(a, plan["skill"], plan["target"]).is_empty(), "AI active executes")
+	a.ap = 3
+	a.qi = 0
+	plan = EnemyAI.plan(s, a)
+	eq(plan["skill"], "普攻", "AI falls back to ordinary attack with low resources")
+	a.ap = 2
+	plan = EnemyAI.plan(s, a)
+	eq(plan["skill"], "", "AI never submits an attack below 3 AP")
+	var b1 := BattleDefs.build_wuxia_b1()
+	for enemy in b1.living(BattleUnit.ENEMY):
+		check(not enemy.active_skills.is_empty(), "B1 enemy has an active art")
+	# Diagonal neighbors must pass the AI's GDD Chebyshev range filter.
+	a.ap = 3
+	a.skills = []
+	b.pos = Vector2i(4, 4)
+	a.pos = Vector2i(3, 3)
+	c.hp = 0
+	d.hp = 0
+	plan = EnemyAI.plan(s, a)
+	eq(plan["skill"], "普攻", "AI can attack diagonal neighbor without movement")
+
+
+func test_wuxia_hud_skill_availability() -> void:
+	var game = root.get_node("Game")
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	game.shot = "wuxia"
+	game.current_battle = "wuxia_b1"
+	var battle = load("res://scripts/game/battle.gd").new()
+	root.add_child(battle)
+	for u in battle.state.living(BattleUnit.PLAYER):
+		battle.state.current_id = u.id
+		u.ap = 6
+		u.qi = 12
+		battle.state.acted = true
+		battle.state.moved = true
+		battle._enter_main()
+		check(not battle.menu_box.get_child(0).disabled, "GDD HUD permits another attack with AP")
+		check(not battle.menu_box.get_child(1).disabled, "GDD HUD permits skills after moving and attacking")
+		battle._on_skills()
+		check(battle.preview_text.text.contains(u.inner), "HUD displays equipped passive inner")
+		for i in range(u.skills.size()):
+			var sid: String = u.skills[i]
+			var button: Button = battle.menu_box.get_child(i)
+			check(button.text.contains(sid), "HUD lists " + sid)
+			check(button.text.contains("AP") and button.text.contains("内力"), "HUD lists both costs " + sid)
+			check(not button.disabled, "available skill enabled " + sid)
+		battle._enter_target(u.lightfoot)
+		eq(battle.sel_target, Vector2i(-1, -1), "lightfoot requires choosing a landing")
+		check(battle.target_set.size() > 0 and not battle.target_set.has(u.pos), "lightfoot highlights legal landings")
+		var landing: Vector2i = battle.target_set[0]
+		battle._select_target(landing)
+		check(not battle.menu_box.get_child(0).disabled, "legal landing can be confirmed")
+		check(battle.preview_text.text.contains(SkillDB.get_skill(u.lightfoot)["desc"]), "landing forecast describes lightfoot effects")
+		u.used_skills[u.lightfoot] = true
+		battle._enter_main()
+		battle._on_skills()
+		check(battle.menu_box.get_child(3).disabled, "used lightfoot greyed out")
+		u.ap = 0
+		u.qi = 0
+		battle._enter_main()
+		check(battle.menu_box.get_child(0).disabled and battle.menu_box.get_child(1).disabled, "main commands greyed out with no AP")
+		battle._on_skills()
+		for i in range(u.skills.size()):
+			check(battle.menu_box.get_child(i).disabled, "unaffordable skill greyed out")
+		battle._enter_target(u.active_skills[0])
+		check(not battle.state.is_valid_target(u, u.active_skills[0], landing), "HUD confirmation cannot bypass insufficient resources")
+	var inspected: BattleUnit = battle.state.living(BattleUnit.PLAYER)[0]
+	inspected.gain_guard()
+	battle._show_info(inspected)
+	check(battle.info_text.text.contains("护势"), "unit info names guard stance")
+	inspected.gain_block()
+	inspected.ap_penalty = 2
+	battle._show_info(inspected)
+	check(battle.info_text.text.contains("格挡") and not battle.info_text.text.contains("护势"), "unit info shows exclusive block stance")
+	check(battle.info_text.text.contains("气脉受阻"), "unit info shows pending seal")
+	inspected.ap_penalty = 0
+	inspected.qi_blocked = true
+	battle._show_info(inspected)
+	check(battle.info_text.text.contains("气脉受阻"), "unit info shows seal through affected action")
+	battle.free()
+	game.shot = old_shot
+	game.current_battle = old_battle

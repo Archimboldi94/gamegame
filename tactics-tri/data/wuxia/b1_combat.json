@@ -25,7 +25,7 @@
       "range": 1,
       "base_hit": 95,
       "kind": "melee_retreat",
-      "retreat_safe": true,
+      "retreat_safe": false,
       "retreat_once": true
     },
     "穿云枪": {
@@ -57,7 +57,7 @@
       "ap": 4,
       "qi": 4,
       "power": 5,
-      "range": 2,
+      "range": 1,
       "base_hit": 85,
       "kind": "seal"
     },
@@ -69,7 +69,11 @@
     "燕行步": {
       "ap": 2,
       "qi": 4,
-      "kind": "leap"
+      "kind": "leap",
+      "range": 3,
+      "cross_low": true,
+      "opportunity_immune": true,
+      "once": true
     },
     "防御": {
       "ap": 2,
@@ -80,6 +84,24 @@
       "ap": 3,
       "qi": 0,
       "kind": "rest"
+    },
+    "横江刀": {
+      "ap": 4,
+      "qi": 3,
+      "power": 9,
+      "range": 1,
+      "base_hit": 90,
+      "kind": "sweep"
+    },
+    "踏雪步": {
+      "ap": 2,
+      "qi": 3,
+      "range": 2,
+      "kind": "leap",
+      "cross_low": false,
+      "opportunity_immune": false,
+      "landing_guard": true,
+      "once": true
     }
   },
   "units": [
@@ -105,8 +127,9 @@
         "守关式"
       ],
       "marker": "A",
-      "inner": "",
-      "lightfoot": "燕行步"
+      "inner": "归元诀",
+      "lightfoot": "燕行步",
+      "weapon": "sword"
     },
     {
       "id": 1,
@@ -127,11 +150,12 @@
       "skills": [
         "穿云枪",
         "挑枪",
-        "守关式"
+        "横江刀"
       ],
       "marker": "B",
-      "inner": "",
-      "lightfoot": "燕行步"
+      "inner": "苍松功",
+      "lightfoot": "踏雪步",
+      "weapon": "spear"
     },
     {
       "id": 2,
@@ -155,8 +179,9 @@
         "守关式"
       ],
       "marker": "D",
-      "inner": "",
-      "lightfoot": "燕行步"
+      "inner": "归元诀",
+      "lightfoot": "踏雪步",
+      "weapon": "fist"
     },
     {
       "id": 3,
@@ -174,10 +199,13 @@
       "evasion": 10,
       "speed": 76,
       "qi": 8,
-      "skills": [],
+      "skills": [
+        "横江刀"
+      ],
       "marker": "1",
       "inner": "",
-      "lightfoot": "燕行步"
+      "lightfoot": "燕行步",
+      "weapon": "blade"
     },
     {
       "id": 4,
@@ -195,10 +223,23 @@
       "evasion": 7,
       "speed": 45,
       "qi": 8,
-      "skills": [],
+      "skills": [
+        "震山掌"
+      ],
       "marker": "2",
       "inner": "",
-      "lightfoot": "燕行步"
+      "lightfoot": "踏雪步",
+      "weapon": "fist"
     }
-  ]
+  ],
+  "inners": {
+    "归元诀": {
+      "start_qi": 1,
+      "desc": "自身行动开始时，额外恢复1点内力。"
+    },
+    "苍松功": {
+      "end_guard_ap": 2,
+      "desc": "行动结束剩余至少2AP时获得一层护势，每次行动至多一次。"
+    }
+  }
 }

@@ -179,10 +179,13 @@ static func build_wuxia_b1(seed := 7) -> BattleState:
 		u.jump = 99
 		u.mov = 6
 		u.basic = "普攻"
-		u.skills = (definition.get("skills", []) as Array).duplicate()
-		var lf := String(definition.get("lightfoot", ""))
-		if lf != "":
-			u.skills.append(lf)
+		u.active_skills = (definition.get("skills", []) as Array).duplicate()
+		u.inner = String(definition.get("inner", ""))
+		u.lightfoot = String(definition.get("lightfoot", ""))
+		u.weapon = String(definition.get("weapon", ""))
+		u.skills = u.active_skills.duplicate()
+		if u.lightfoot != "":
+			u.skills.append(u.lightfoot)
 		u.skills.append("防御")
 		u.skills.append("调息")
 		var marker_key := String(definition["marker"])
@@ -192,7 +195,7 @@ static func build_wuxia_b1(seed := 7) -> BattleState:
 		u.is_lord = u.team == BattleUnit.PLAYER and u.id == 0
 		u.title = "青崖渡同行" if u.team == BattleUnit.PLAYER else "渡口劫匪"
 		u.ai = "aggressive"
-		u.cls = "swordsman"
+		u.cls = "lancer" if u.weapon == "spear" else "swordsman"
 		units.append(u)
 	var s := BattleState.new()
 	s.setup(map, units, "all", seed)

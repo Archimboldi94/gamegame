@@ -377,8 +377,15 @@ func _show_info(u: BattleUnit) -> void:
 	var bar := Color(0.35, 0.9, 0.4) if ratio > 0.5 else (Color(1.0, 0.8, 0.25) if ratio > 0.25 else Color(1.0, 0.3, 0.25))
 	info_hp.add_theme_stylebox_override("fill", UIKit.color_box(bar, 6))
 	var resource := "AP [color=#8cf]%d/%d[/color]  内力 %d/%d  RP %d" % [u.ap, u.max_ap, u.qi, u.max_qi, u.rp] if u.use_gdd_rules else "TP [color=#8cf]%s[/color]" % tp
+	var status := ""
+	if u.guard:
+		status += "   [color=#ffd27a][%s][/color]" % ("护势" if u.use_gdd_rules else "守势")
+	if u.use_gdd_rules and u.block:
+		status += "   [color=#ffd27a][格挡][/color]"
+	if u.use_gdd_rules and (u.ap_penalty > 0 or u.qi_blocked):
+		status += "   [color=#ffb080][气脉受阻][/color]"
 	var t := "HP [color=#9f9]%d[/color]/%d    %s%s\n" % [
-		u.hp, u.max_hp, resource, "   [color=#ffd27a][守势][/color]" if u.guard else ""]
+		u.hp, u.max_hp, resource, status]
 	t += "攻%d 防%d 魔%d 抗%d 速%d  移%d 跳%d  朝向%s\n" % [
 		u.atk, u.def, u.mag, u.res, u.spd, u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing]]
 	t += _terrain_text(u.pos)
@@ -631,7 +638,7 @@ func _ai_turn(u: BattleUnit) -> void:
 		var sid: String = plan["skill"]
 		var tgt: Vector2i = plan["target"]
 		var sk := SkillDB.get_skill(sid)
-		for p in Combat.affected_tiles(sk, u.pos, tgt):
+		for p in Combat.affected_tiles(sk, u.pos, tgt, state.map):
 			_set_hl(p, COL_AREA, true)
 		_banner(sk["name"], COL_ENEMY if u.team == BattleUnit.ENEMY else COL_PLAYER, 0.4)
 		await _wait(0.35)
@@ -719,19 +726,29 @@ func _enter_main() -> void:
 		for p in stand:
 			if p != u.pos:
 				_set_hl(p, COL_MOVE)
-	if not state.acted:
+	if u.use_gdd_rules or not state.acted:
 		_show_reach(u, stand)
 	_set_cursor(u.pos)
-	if not state.moved:
+	if u.use_gdd_rules:
+		_hint("剩余AP内可继续移动或出招；「待机」结束本次行动")
+	elif not state.moved:
 		_hint("蓝色格可移动 · 红框为攻击范围 · 同格再点切换地面 / 单位")
 	elif not state.acted:
 		_hint("选择行动；「撤销移动」可回到原位")
 	else:
 		_hint("可以继续移动，或「待机」结束回合")
 	var basic := SkillDB.get_skill(u.basic)
+	var can_attack := state.skill_usable(u, u.basic) if u.use_gdd_rules else not state.acted
+	var can_skill := false
+	for sid in u.skills:
+		if state.skill_usable(u, sid):
+			can_skill = true
+	var attack_label := "攻击 · %s" % basic["name"]
+	if u.use_gdd_rules:
+		attack_label += " · " + _skill_cost(basic)
 	_set_menu([
-		["攻击 · %s" % basic["name"], _on_attack, not state.acted],
-		["技能", _on_skills, not state.acted],
+		[attack_label, _on_attack, can_attack],
+		["技能", _on_skills, can_skill if u.use_gdd_rules else not state.acted],
 		["撤销移动", _on_undo, state.can_undo_move()],
 		["待机（结束）", _end_turn, true],
 	], _menu_title(u))
@@ -793,12 +810,14 @@ func _on_skills() -> void:
 	_set_cursor(u.pos)
 	var items := []
 	var desc := "[b]%s 的技能[/b]   %s\n" % [u.name, _menu_title(u)]
+	if u.use_gdd_rules and u.inner != "":
+		desc += "内功：%s · %s\n" % [u.inner, SkillDB.get_inner(u.inner).get("desc", "")]
 	for sid in u.skills:
 		var sk := SkillDB.get_skill(sid)
 		var ok := state.skill_usable(u, sid)
 		var cost_txt := _skill_cost(sk)
 		items.append(["%s  ·  %s" % [sk["name"], cost_txt], _enter_target.bind(sid), ok])
-		var need := ("资源不足" if u.use_gdd_rules else "TP不足")
+		var need := ("本行动已使用" if bool(sk.get("once", false)) and u.used_skills.get(sid, false) else "资源不足") if u.use_gdd_rules else "TP不足"
 		desc += "[color=#ffd27a]%s[/color] (%s)%s：%s\n" % [sk["name"], cost_txt, "" if ok else "[color=#ff8080]%s[/color]" % need, sk["desc"]]
 	items.append(["返回", _enter_main, true])
 	_set_menu(items, _menu_title(u))
@@ -823,10 +842,10 @@ func _enter_target(sid: String) -> void:
 		_set_hl(u.pos, COL_AREA)
 		preview_text.text += "\n作用于自身 · 确认后立即生效"
 		_hint("确认后立即生效")
-		_set_menu([["确认", _confirm, true], ["取消", _enter_main, true]], sk["name"])
+		_set_menu([["确认", _confirm, state.is_valid_target(u, sid, u.pos)], ["取消", _enter_main, true]], sk["name"])
 	else:
 		target_set = state.target_tiles(u, sid, u.pos)
-		var col := COL_HEAL if sk["kind"] == "heal" else COL_ATTACK
+		var col := COL_MOVE if sk["shape"] == "leap" else (COL_HEAL if sk["kind"] == "heal" else COL_ATTACK)
 		for p in target_set:
 			_set_hl(p, col)
 			var o := state.unit_at(p)
@@ -849,7 +868,7 @@ func _select_target(cell: Vector2i) -> void:
 	sel_ground = false
 	var sk := SkillDB.get_skill(sel_skill)
 	_clear_hl2()
-	for p in Combat.affected_tiles(sk, u.pos, cell):
+	for p in Combat.affected_tiles(sk, u.pos, cell, state.map):
 		_set_hl(p, COL_AREA, true)
 	_set_cursor(cell)
 	var entries := state.preview(u, sel_skill, cell)
@@ -865,7 +884,7 @@ func _select_target(cell: Vector2i) -> void:
 func _show_preview(sk: Dictionary, entries: Array) -> void:
 	var t := "[b]%s[/b]  %s\n" % [sk["name"], _skill_cost(sk)]
 	if entries.is_empty():
-		t += "范围内没有可作用的目标。"
+		t += sk["desc"] if sk["shape"] == "leap" else "范围内没有可作用的目标。"
 	for e in entries:
 		var tu: BattleUnit = e["unit"]
 		if e["heal"]:
@@ -921,7 +940,9 @@ func _confirm() -> void:
 	if oc != "":
 		_finish(oc)
 		return
-	if state.acted and state.moved:
+	if not u.alive():
+		_end_turn()
+	elif not u.use_gdd_rules and state.acted and state.moved:
 		await _wait(0.12)
 		_end_turn()
 	else:
@@ -1131,7 +1152,7 @@ func _cast(u: BattleUnit, sk: Dictionary, tgt: Vector2i, primary: Array) -> void
 			fx.glow(a_body, col, 1.3, 0.3)
 			n.lunge(-dir, 10.0)
 			await _wait(0.12)
-			var area := Combat.affected_tiles(sk, u.pos, tgt)
+			var area := Combat.affected_tiles(sk, u.pos, tgt, state.map)
 			for i in area.size():
 				var p: Vector2i = area[i]
 				if p != tgt and state.map.in_bounds(p):
@@ -1153,7 +1174,7 @@ func _cast(u: BattleUnit, sk: Dictionary, tgt: Vector2i, primary: Array) -> void
 			await fx.projectile(a_body + Vector2(0, -50), t_body, "fireball", col)
 			fx.ring(_tile_top(tgt), col, 150.0, 0.35)
 			_shake_cam(8.0)
-			for p in Combat.affected_tiles(sk, u.pos, tgt):
+			for p in Combat.affected_tiles(sk, u.pos, tgt, state.map):
 				if state.map.in_bounds(p):
 					fx.tile_flash(_tile_top(p), col, 0.35)
 					fx.burst(_tile_top(p) + Vector2(0, -20), col, 10, 110.0, 0.4, 140.0, 8.0)
@@ -1162,7 +1183,7 @@ func _cast(u: BattleUnit, sk: Dictionary, tgt: Vector2i, primary: Array) -> void
 			n.flash(col, 0.6, 0.3)
 			await _wait(0.18)
 			fx.ring(_tile_top(tgt), col, 150.0, 0.35)
-			for p in Combat.affected_tiles(sk, u.pos, tgt):
+			for p in Combat.affected_tiles(sk, u.pos, tgt, state.map):
 				if state.map.in_bounds(p):
 					fx.tile_flash(_tile_top(p), Color(0.8, 0.95, 1.0), 0.35)
 					fx.burst(_tile_top(p) + Vector2(0, -110), col, 10, 60.0, 0.35, -160.0, 7.0)
@@ -1173,7 +1194,7 @@ func _cast(u: BattleUnit, sk: Dictionary, tgt: Vector2i, primary: Array) -> void
 			await _wait(0.14)
 			if sid == "mass_heal":
 				fx.ring(_tile_top(tgt), col, 150.0, 0.4)
-				for p in Combat.affected_tiles(sk, u.pos, tgt):
+				for p in Combat.affected_tiles(sk, u.pos, tgt, state.map):
 					if state.map.in_bounds(p):
 						fx.tile_flash(_tile_top(p), col, 0.35)
 			for e in primary:
@@ -1244,6 +1265,17 @@ func _secondary(e: Dictionary, att: BattleUnit, shown: Dictionary) -> void:
 	var t = e.get("unit")
 	var n = unit_nodes[t.id] if t != null else null
 	match e["type"]:
+		"leap", "retreat":
+			var tw := create_tween()
+			tw.tween_property(n, "position", _tile_top(e["to"]), 0.16)
+			await tw.finished
+			n.place_at(e["to"], state.map.get_h(e["to"]))
+			n.face()
+		"counter", "opportunity":
+			var hit_event := e.duplicate()
+			hit_event["type"] = "damage" if e["hit"] else "miss"
+			_react(hit_event, e["by"], SkillDB.get_skill(e["by"].basic), shown)
+			await _wait(0.25)
 		"steal":
 			var by: BattleUnit = e["by"]
 			fx.number(n.body_pos() + Vector2(0, -78), "技力 -%d" % e["amount"], Color(0.6, 0.85, 1.0))
@@ -1408,9 +1440,9 @@ func _desktop_key(event: InputEventKey) -> bool:
 		var started: int = held_keys.get(key, -1)
 		held_keys.erase(key)
 		if started >= 0 and key in [KEY_A, KEY_S] and Time.get_ticks_msec() - started < KEY_PAN_DELAY_MS and overlay == null:
-			if key == KEY_A and mode == "main" and not state.acted:
+			if key == KEY_A and mode == "main" and (state.current().use_gdd_rules or not state.acted):
 				_on_attack()
-			elif key == KEY_S and mode in ["main", "target"] and not state.acted:
+			elif key == KEY_S and mode in ["main", "target"] and (state.current().use_gdd_rules or not state.acted):
 				_on_skills()
 		return true
 	held_keys[key] = Time.get_ticks_msec()
@@ -1611,7 +1643,7 @@ func _on_tap(pos: Vector2) -> void:
 			if state.can_move(u) and not move_info.is_empty() and (move_info["ends"] as Array).has(cell) and cell != u.pos:
 				_do_move(cell)
 				return
-			if other != null and other.team != u.team and not state.acted and not sel_ground:
+			if other != null and other.team != u.team and (u.use_gdd_rules or not state.acted) and not sel_ground:
 				var basic_targets := state.target_tiles(u, u.basic, u.pos)
 				if basic_targets.has(cell) and cell != focus_cell:
 					_enter_target(u.basic)

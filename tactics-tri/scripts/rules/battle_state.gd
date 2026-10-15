@@ -101,9 +101,10 @@ func begin_next_turn() -> Dictionary:
 				for other in units:
 					if other.alive():
 						other.rp = 1
-			u.ap = maxi(0, u.max_ap - u.ap_penalty)
+			u.qi_blocked = u.ap_penalty > 0
+			u.ap = maxi(0, u.max_ap - mini(2, u.ap_penalty))
 			u.ap_penalty = 0
-			u.qi = mini(u.max_qi, u.qi + 1)
+			u.qi = mini(u.max_qi, u.qi + 1 + int(SkillDB.get_inner(u.inner).get("start_qi", 0)))
 			u.used_skills.clear()
 		if map.effect_at(u.pos) == "fire":
 			var burn := u.take_damage(maxi(3, u.max_hp / 10))
@@ -136,6 +137,12 @@ func end_turn() -> void:
 	var u := current()
 	if u == null:
 		return
+	if u.use_gdd_rules:
+		var inner := SkillDB.get_inner(u.inner)
+		if u.alive() and inner.has("end_guard_ap") and u.ap >= int(inner["end_guard_ap"]) and not u.used_skills.get("inner_end", false):
+			u.gain_guard()
+			u.used_skills["inner_end"] = true
+		u.qi_blocked = false
 	u.facing = auto_facing(u)
 	order.end_turn(u.id, TurnOrder.cost_for(moved, acted))
 	current_id = -1
@@ -216,8 +223,12 @@ func undo_move() -> void:
 # ------------------------------------------------------------------ actions
 
 func skill_usable(u: BattleUnit, sid: String) -> bool:
+	if not SkillDB.has_skill(sid):
+		return false
 	var sk := SkillDB.get_skill(sid)
 	if u.use_gdd_rules:
+		if not u.alive() or not u.all_actions().has(sid):
+			return false
 		if bool(sk.get("once", false)) and u.used_skills.get(sid, false):
 			return false
 		return u.ap >= int(sk.get("ap", 0)) and u.qi >= int(sk.get("qi", 0))
@@ -226,6 +237,8 @@ func skill_usable(u: BattleUnit, sid: String) -> bool:
 
 func target_tiles(u: BattleUnit, sid: String, from: Vector2i) -> Array:
 	var sk := SkillDB.get_skill(sid)
+	if sk["shape"] == "leap":
+		return lightfoot_reach(u, sk, from)["ends"]
 	if sk["shape"] == "self":
 		return [from]
 	var out := []
@@ -236,6 +249,10 @@ func target_tiles(u: BattleUnit, sid: String, from: Vector2i) -> Array:
 			if Combat.can_target(map, sk, from, p):
 				out.append(p)
 	return out
+
+
+func lightfoot_reach(u: BattleUnit, sk: Dictionary, from: Vector2i) -> Dictionary:
+	return Pathing.lightfoot_search(map, u, units, from, int(sk["rmax"]), bool(sk.get("cross_low", false)))
 
 
 func pincer_partner(att: BattleUnit, tgt: BattleUnit, from: Vector2i) -> BattleUnit:
@@ -254,10 +271,10 @@ func preview(u: BattleUnit, sid: String, tile: Vector2i, from := Vector2i(-999, 
 	if from == Vector2i(-999, -999):
 		from = u.pos
 	var sk := SkillDB.get_skill(sid)
-	if sk["kind"] == "self":
+	if sk["kind"] == "self" or sk["shape"] == "leap":
 		return []
 	var out := []
-	for p in Combat.affected_tiles(sk, from, tile):
+	for p in Combat.affected_tiles(sk, from, tile, map):
 		var t := unit_at(p)
 		if t == u and p != from:
 			t = null
@@ -272,7 +289,7 @@ func preview(u: BattleUnit, sid: String, tile: Vector2i, from := Vector2i(-999, 
 			continue
 		var e := Combat.calc(u, t, sk, map, from)
 		e["unit"] = t
-		if sk["kind"] == "phys" and PINCER_SHAPES.has(sk["shape"]) and p == tile:
+		if not u.use_gdd_rules and sk["kind"] == "phys" and PINCER_SHAPES.has(sk["shape"]) and p == tile:
 			var partner := pincer_partner(u, t, from)
 			if partner != null:
 				var fsk := SkillDB.get_skill(partner.basic)
@@ -286,9 +303,13 @@ func preview(u: BattleUnit, sid: String, tile: Vector2i, from := Vector2i(-999, 
 
 
 func is_valid_target(u: BattleUnit, sid: String, tile: Vector2i) -> bool:
+	if u.use_gdd_rules and not skill_usable(u, sid):
+		return false
 	var sk := SkillDB.get_skill(sid)
+	if sk["shape"] == "leap":
+		return (lightfoot_reach(u, sk, u.pos)["ends"] as Array).has(tile)
 	if sk["kind"] == "self":
-		return true
+		return tile == u.pos
 	if not Combat.can_target(map, sk, u.pos, tile):
 		return false
 	if not preview(u, sid, tile).is_empty():
@@ -301,6 +322,9 @@ func _roll(hit: int) -> bool:
 
 
 func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
+	# Validate everything before mutating resources, usage limits, facing or turn flags.
+	if u.use_gdd_rules and (not skill_usable(u, sid) or not is_valid_target(u, sid, tile)):
+		return []
 	var sk := SkillDB.get_skill(sid)
 	var events := []
 	if u.use_gdd_rules:
@@ -314,12 +338,13 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 	if sk["kind"] == "self" or sk.get("shape") == "leap":
 		match sk.get("effect", ""):
 			"guard":
-				u.guard = true
-				u.block = false
-				events.append({"type": "buff", "unit": u, "text": "守势" if not u.use_gdd_rules else "护势"})
+				if u.use_gdd_rules:
+					u.gain_block()
+				else:
+					u.gain_guard()
+				events.append({"type": "buff", "unit": u, "text": "格挡" if u.use_gdd_rules else "守势"})
 			"shield":
-				u.guard = true
-				u.block = false
+				u.gain_guard()
 				events.append({"type": "buff", "unit": u, "text": "护势"})
 			"rest":
 				u.qi = mini(u.max_qi, u.qi + 4)
@@ -331,19 +356,22 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 				origin_facing = u.facing
 				events.append({"type": "buff", "unit": u, "text": "疾风"})
 			"leap":
-				# Simplified: treat as free reposition within range paying already-deducted AP/qi.
-				if Combat.can_target(map, sk, u.pos, tile) and unit_at(tile) == null and map.is_passable(tile, u.flying):
+				var path := Pathing.path_to(lightfoot_reach(u, sk, u.pos), u.pos, tile)
+				for i in range(1, path.size()):
 					var old := u.pos
-					u.pos = tile
-					u.facing = Combat.dir_toward(old, tile, u.facing)
-					events.append({"type": "leap", "unit": u, "from": old, "to": tile})
-				else:
-					# refund if invalid (should be gated by UI)
-					if u.use_gdd_rules:
-						u.ap += int(sk.get("ap", 0))
-						u.qi += int(sk.get("qi", 0))
-						u.used_skills.erase(sid)
-					events.append({"type": "buff", "unit": u, "text": "燕行步失败"})
+					var dest: Vector2i = path[i]
+					if not bool(sk.get("opportunity_immune", false)):
+						var reactors := ControlZone.leaving_sources(u, old, dest, units, map)
+						if not reactors.is_empty():
+							events.append_array(_resolve_reaction(reactors[0], u, true))
+					if not u.alive():
+						break
+					u.pos = dest
+					u.facing = Combat.dir_toward(old, dest, u.facing)
+					events.append({"type": "leap", "unit": u, "from": old, "to": dest})
+				if u.alive() and u.pos == tile and bool(sk.get("landing_guard", false)):
+					u.gain_guard()
+					events.append({"type": "buff", "unit": u, "text": "护势"})
 		return events
 	var from := u.pos
 	if tile != from:
@@ -357,7 +385,9 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 			continue
 		if not _roll(e["hit"]):
 			events.append({"type": "miss", "unit": t, "by": u})
-			if u.use_gdd_rules and t.alive() and e.get("side", "") != "back" and ControlZone.can_react(t, u, map, u.pos):
+			if sk.get("effect", "") == "retreat" and u.use_gdd_rules:
+				events.append_array(_retreat(u, sk, tile))
+			if u.use_gdd_rules and sk["shape"] == "single" and t.pos == tile and t.alive() and e.get("side", "") != "back" and ControlZone.can_react(t, u, map, u.pos):
 				events.append_array(_resolve_reaction(t, u, false))
 			continue
 		var dealt := t.take_damage(e["dmg"])
@@ -367,6 +397,8 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 		events.append({"type": "damage", "unit": t, "by": u, "amount": dealt, "side": e["side"], "killed": not t.alive()})
 		if not t.alive():
 			order.remove(t.id)
+			if sk.get("effect", "") == "retreat" and u.use_gdd_rules:
+				events.append_array(_retreat(u, sk, tile))
 			continue
 		match sk.get("effect", ""):
 			"steal":
@@ -377,26 +409,19 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 			"ice":
 				order.delay(t.id, FROST_DELAY)
 				events.append({"type": "delay", "unit": t, "amount": FROST_DELAY})
-			"knockback", "wuxia_push":
+			"knockback":
 				events.append_array(_knockback(t, from))
+			"wuxia_push":
+				events.append_array(_wuxia_push(t, from))
 			"seal":
-				t.ap_penalty = maxi(t.ap_penalty, 1)
-				events.append({"type": "buff", "unit": t, "text": "截脉 -1AP"})
+				t.ap_penalty = 2
+				events.append({"type": "buff", "unit": t, "text": "气脉受阻：下次行动 -2AP"})
 			"retreat":
-				var back := from - (tile - from)
-				# retreat one step away from target along attack axis; safe = no ZoC
-				var retreat_dir := Vector2i(signi(from.x - tile.x), signi(from.y - tile.y))
-				if retreat_dir == Vector2i.ZERO:
-					retreat_dir = -BattleMap.DIRS[u.facing]
-				var dest := u.pos + retreat_dir
-				if map.is_passable(dest, u.flying) and unit_at(dest) == null and not Pathing.closed_corner(map, u.pos, dest, u.flying):
-					var oldp := u.pos
-					u.pos = dest
-					events.append({"type": "retreat", "unit": u, "from": oldp, "to": dest})
+				events.append_array(_retreat(u, sk, tile))
 		if t.alive() and e.has("pincer"):
 			events.append_array(_pincer(e["pincer"], t))
 		# Auto-counter after a direct single-target attack (GDD).
-		if u.use_gdd_rules and t.alive() and e.get("side", "") != "back":
+		if u.use_gdd_rules and sk["shape"] == "single" and t.alive() and e.get("side", "") != "back":
 			if ControlZone.can_react(t, u, map, u.pos):
 				events.append_array(_resolve_reaction(t, u, false))
 	if sk.get("effect", "") == "fire" or sk.get("effect", "") == "ice":
@@ -406,6 +431,37 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 				changed.append(p)
 		events.append({"type": "terrain", "tiles": changed, "effect": sk["effect"]})
 	return events
+
+
+func _retreat(u: BattleUnit, sk: Dictionary, target: Vector2i) -> Array:
+	if not u.alive() or u.used_skills.get("retreat", false):
+		return []
+	var step := Vector2i(signi(u.pos.x - target.x), signi(u.pos.y - target.y))
+	var dest := u.pos + step
+	if Pathing.enter_cost(map, u.jump, u.pos, dest, u.flying) < 0 or unit_at(dest) != null:
+		return []
+	u.used_skills["retreat"] = true
+	var events := []
+	if not bool(sk.get("retreat_safe", false)):
+		var reactors := ControlZone.leaving_sources(u, u.pos, dest, units, map)
+		if not reactors.is_empty():
+			events.append_array(_resolve_reaction(reactors[0], u, true))
+	if u.alive():
+		var old := u.pos
+		u.pos = dest
+		events.append({"type": "retreat", "unit": u, "from": old, "to": dest})
+	return events
+
+
+## GDD forced movement: eight directions, no collision or falling bonus damage, no ZoC.
+func _wuxia_push(t: BattleUnit, from: Vector2i) -> Array:
+	var step := Vector2i(signi(t.pos.x - from.x), signi(t.pos.y - from.y))
+	var dest := t.pos + step
+	if Pathing.enter_cost(map, t.jump, t.pos, dest, t.flying) < 0 or unit_at(dest) != null:
+		return []
+	var old := t.pos
+	t.pos = dest
+	return [{"type": "knockback", "unit": t, "from": old, "to": dest, "amount": 0, "killed": false}]
 
 
 func _pincer(partner: BattleUnit, t: BattleUnit) -> Array:

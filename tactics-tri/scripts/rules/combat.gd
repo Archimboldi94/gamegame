@@ -87,6 +87,16 @@ static func affected_tiles(skill: Dictionary, from: Vector2i, tile: Vector2i, ma
 	match skill["shape"]:
 		"self":
 			return [from]
+		"arc3":
+			if from == tile:
+				return []
+			var facing := dir_toward(from, tile)
+			var out := []
+			for offset in [-1, 0, 1]:
+				var p: Vector2i = from + BattleMap.DIRS[posmod(facing + offset, 8)]
+				if map == null or can_target(map, skill, from, p):
+					out.append(p)
+			return out
 		"line":
 			var step := Vector2i(signi(tile.x - from.x), signi(tile.y - from.y))
 			if step == Vector2i.ZERO:

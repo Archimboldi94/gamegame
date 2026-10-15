@@ -34,6 +34,11 @@ var acc := 0
 var block := false
 var used_skills: Dictionary = {}
 var ap_penalty := 0
+var qi_blocked := false  # active during the one action that consumed ap_penalty
+var active_skills: Array = []  # three equipped active slots; basic commands are separate
+var inner := ""
+var lightfoot := ""
+var weapon := ""
 var pos := Vector2i.ZERO
 var facing := 4
 var basic := "slash"
@@ -97,3 +102,13 @@ func class_label() -> String:
 
 func all_actions() -> Array:
 	return [basic] + skills
+
+
+func gain_guard() -> void:
+	guard = true
+	block = false
+
+
+func gain_block() -> void:
+	block = true
+	guard = false
