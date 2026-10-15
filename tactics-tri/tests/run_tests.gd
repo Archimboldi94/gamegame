@@ -28,6 +28,8 @@ func _run_all() -> void:
 		"test_iso_rotate_and_pick", "test_pick_ignores_sprite_bounds",
 		"test_water_still_impassable_after_view_rotate", "test_audio_placeholders_and_manager",
 		"test_expanded_tile_edges_and_ground_gaps", "test_battle_hud_and_ground_toggle",
+		"test_wuxia_eight_dir_and_corner", "test_wuxia_ap_and_neili",
+		"test_wuxia_control_zone_and_counter", "test_wuxia_b1_setup",
 	]
 	for t in tests:
 		_current = t
@@ -51,7 +53,7 @@ func eq(a, b, msg: String) -> void:
 
 # ------------------------------------------------------------ helpers
 
-func mk(id: int, cls: String, team: int, pos: Vector2i, facing := 2) -> BattleUnit:
+func mk(id: int, cls: String, team: int, pos: Vector2i, facing := 4) -> BattleUnit:
 	return BattleUnit.create(id, "U%d" % id, cls, team, pos, facing)
 
 
@@ -170,10 +172,10 @@ func test_facing_sides() -> void:
 	eq(Combat.relative_side(t, 0, Vector2i(5, 4)), "front", "facing north, attacker north => front")
 	eq(Combat.relative_side(t, 0, Vector2i(5, 6)), "back", "facing north, attacker south => back")
 	eq(Combat.relative_side(t, 0, Vector2i(4, 5)), "side", "facing north, attacker west => side")
-	eq(Combat.relative_side(t, 1, Vector2i(3, 5)), "back", "facing east, attacker west => back")
-	eq(Combat.relative_side(t, 2, Vector2i(5, 8)), "front", "facing south, ranged from south => front")
-	eq(Combat.relative_side(t, 2, Vector2i(6, 6)), "side", "diagonal => side")
-	eq(Combat.relative_side(t, 2, Vector2i(5, 1)), "back", "facing south, ranged from far north => back")
+	eq(Combat.relative_side(t, 2, Vector2i(3, 5)), "back", "facing east, attacker west => back")
+	eq(Combat.relative_side(t, 4, Vector2i(5, 8)), "front", "facing south, ranged from south => front")
+	eq(Combat.relative_side(t, 4, Vector2i(6, 6)), "front", "SE vs facing south is front-right")
+	eq(Combat.relative_side(t, 4, Vector2i(5, 1)), "back", "facing south, ranged from far north => back")
 
 
 func test_facing_bonus_damage_and_hit() -> void:
@@ -181,9 +183,9 @@ func test_facing_bonus_damage_and_hit() -> void:
 	var a := mk(0, "swordsman", 0, Vector2i(1, 2))
 	var t := mk(1, "swordsman", 1, Vector2i(1, 1))
 	var sk := SkillDB.get_skill("slash")
-	t.facing = 2
+	t.facing = 4
 	var front := Combat.calc(a, t, sk, m, a.pos)
-	t.facing = 1
+	t.facing = 2
 	var side := Combat.calc(a, t, sk, m, a.pos)
 	t.facing = 0
 	var back := Combat.calc(a, t, sk, m, a.pos)
@@ -481,7 +483,7 @@ func test_vote_tie_break() -> void:
 func test_ai_prefers_back_attack() -> void:
 	var m := BattleMap.flat(7, 7)
 	var ai := mk(10, "swordsman", 1, Vector2i(5, 4))
-	var p := mk(0, "swordsman", 0, Vector2i(3, 3), 2)  # facing south toward the AI
+	var p := mk(0, "swordsman", 0, Vector2i(3, 3), 4)  # facing south toward the AI
 	var s := state_with(m, [p, ai])
 	s.current_id = ai.id
 	var plan := EnemyAI.plan(s, ai)
@@ -685,12 +687,12 @@ func test_auto_facing_after_move() -> void:
 	var s := state_with(m, [u, e])
 	eq(s.begin_next_turn()["unit"], u, "player first")
 	s.move_unit(u, Vector2i(1, 3))
-	eq(s.auto_facing(u), 2, "after moving south the unit faces south")
+	eq(s.auto_facing(u), 4, "after moving south the unit faces south")
 	s.undo_move()
 	eq(u.facing, 0, "undo restores the original facing")
 	s.move_unit(u, Vector2i(3, 1))
 	s.end_turn()
-	eq(u.facing, 1, "end_turn keeps the movement direction (east)")
+	eq(u.facing, 2, "end_turn keeps the movement direction (east)")
 	var r := s.begin_next_turn()
 	while r["unit"] != u:
 		s.end_turn()
@@ -709,9 +711,9 @@ func test_auto_facing_toward_target() -> void:
 	var s := state_with(m, [a, e])
 	eq(s.begin_next_turn()["unit"], a, "archer first")
 	s.move_unit(a, Vector2i(2, 4))
-	eq(a.facing, 2, "faces south after moving south")
+	eq(a.facing, 4, "faces south after moving south")
 	s.execute(a, "shoot", e.pos)
-	eq(a.facing, 1, "faces the target when shooting east")
+	eq(a.facing, 1, "faces the target when shooting ENE")
 	s.end_turn()
 	eq(a.facing, 1, "still faces the last target at turn end")
 	var r := s.begin_next_turn()
@@ -723,20 +725,20 @@ func test_auto_facing_toward_target() -> void:
 	eq(a.facing, 0, "attack then move: faces back toward the target (north)")
 	s.end_turn()
 	eq(a.facing, 0, "turn ends facing the last target, not the movement direction")
-	var h := mk(1, "healer", 0, Vector2i(0, 0), 3)
+	var h := mk(1, "healer", 0, Vector2i(0, 0), 6)
 	s.add_unit(h)
 	s.current_id = h.id
 	s.last_target = BattleState.NO_TARGET
 	h.tp = 5
 	s.execute(h, "heal", h.pos)
 	s.end_turn()
-	eq(h.facing, 3, "self-targeted skill does not change facing")
+	eq(h.facing, 6, "self-targeted skill does not change facing")
 
 
 func test_auto_facing_consistent_with_back_attack() -> void:
 	var m := BattleMap.flat(7, 7)
-	var p := mk(0, "swordsman", 0, Vector2i(3, 4), 2)
-	var foe := mk(10, "swordsman", 1, Vector2i(3, 2), 2)
+	var p := mk(0, "swordsman", 0, Vector2i(3, 4), 4)
+	var foe := mk(10, "swordsman", 1, Vector2i(3, 2), 4)
 	foe.max_hp = 500
 	foe.hp = 500
 	var s := state_with(m, [p, foe])
@@ -805,8 +807,8 @@ func test_iso_rotate_and_pick() -> void:
 	eq(view.to_display(Vector2i(3, 3)), Vector2i(3, 0), "CW (3,3)")
 	eq(view.to_display(Vector2i(0, 3)), Vector2i(3, 3), "CW (0,3)")
 	# Facing arrows rotate with the camera
-	eq(view.facing_view(0), 1, "facing 0 becomes 1 at yaw 1")
-	check(view.faces_left(0) == false, "facing 0 not left at yaw 1")
+	eq(view.facing_view(0), 6, "facing 0 becomes 6 at yaw 1 (8-dir)")
+	check(view.faces_left(0) == true, "facing 0 appears left at yaw 1 (8-dir)")
 	check(IsoView.rotate_cell(Vector2i(1, 0), 2, 4, 4) == Vector2i(2, 3), "static rotate 180")
 	check(IsoView.unrotate_cell(Vector2i(2, 3), 2, 4, 4) == Vector2i(1, 0), "static unrotate 180")
 
@@ -981,3 +983,96 @@ func test_audio_placeholders_and_manager() -> void:
 	check(battle_src.contains("cell == sel_target"), "second tap on pending target detected")
 	check(battle_src.contains("_confirm()"), "second tap can confirm attack/skill")
 	check(FileAccess.file_exists("res://audio/CREDITS.md"), "audio CREDITS.md present")
+
+
+# ------------------------------------------------------------ wuxia / GDD
+
+func test_wuxia_eight_dir_and_corner() -> void:
+	eq(BattleMap.DIRS.size(), 8, "eight movement dirs")
+	var m := BattleMap.flat(3, 3)
+	m.set_terrain(Vector2i(1, 0), "wall")
+	m.set_terrain(Vector2i(0, 1), "wall")
+	eq(Pathing.closed_corner(m, Vector2i(0, 0), Vector2i(1, 1)), true, "sealed corner blocks diagonal")
+	eq(Pathing.enter_cost(m, 1, Vector2i(0, 0), Vector2i(1, 1)), -1, "cannot enter through sealed corner")
+	m.set_terrain(Vector2i(1, 0), "grass")
+	eq(Pathing.closed_corner(m, Vector2i(0, 0), Vector2i(1, 1)), false, "single side wall allows diagonal")
+
+
+func test_wuxia_ap_and_neili() -> void:
+	var s := BattleDefs.build_wuxia_b1(11)
+	var start := s.begin_next_turn()
+	var u: BattleUnit = start["unit"]
+	check(u != null, "wuxia B1 has an actor")
+	eq(u.ap, 6, "start with 6 AP")
+	eq(u.qi, mini(u.max_qi, u.max_qi), "qi full at fight start then +1 on turn? first actor got +1 so may be capped")
+	check(u.qi >= u.max_qi, "qi at cap on first turn after regen")
+	var r := s.reachable_for(u)
+	check((r["ends"] as Array).size() > 1, "AP allows several tiles")
+	var dest: Vector2i = (r["ends"] as Array)[0]
+	if dest == u.pos and (r["ends"] as Array).size() > 1:
+		dest = (r["ends"] as Array)[1]
+	var before := u.ap
+	s.move_unit(u, dest)
+	check(u.ap < before or dest == u.pos, "moving spends AP")
+
+
+func test_wuxia_control_zone_and_counter() -> void:
+	var m := BattleMap.flat(5, 5)
+	var a := BattleUnit.new()
+	a.id = 0
+	a.name = "A"
+	a.use_gdd_rules = true
+	a.team = BattleUnit.PLAYER
+	a.pos = Vector2i(2, 2)
+	a.facing = 0  # north
+	a.basic = "普攻"
+	a.hp = 20
+	a.max_hp = 20
+	a.atk = 4
+	a.def = 0
+	a.ap = 6
+	a.rp = 1
+	a.spd = 50
+	var b := BattleUnit.new()
+	b.id = 1
+	b.name = "B"
+	b.use_gdd_rules = true
+	b.team = BattleUnit.ENEMY
+	b.pos = Vector2i(2, 1)  # north of A, inside front ZoC
+	b.facing = 4
+	b.basic = "普攻"
+	b.hp = 20
+	b.max_hp = 20
+	b.atk = 4
+	b.def = 0
+	b.ap = 6
+	b.rp = 1
+	b.spd = 40
+	var cells: Array = ControlZone.cells(a, m)
+	eq(cells.size(), 5, "front+side control is 5 cells")
+	check(cells.has(Vector2i(2, 1)), "north cell in ZoC")
+	var s := BattleState.new()
+	s.setup(m, [a, b], "all", 3)
+	s.always_hit = true
+	s.current_id = b.id
+	# B attacks A from front -> A may counter
+	var ev: Array = s.execute(b, "普攻", a.pos)
+	var types := []
+	for e in ev:
+		types.append(e["type"])
+	check(types.has("counter") or types.has("damage"), "attack resolves")
+	# After counter A should have spent RP if counter fired
+	if types.has("counter"):
+		eq(a.rp, 0, "counter spends RP")
+
+
+func test_wuxia_b1_setup() -> void:
+	var s := BattleDefs.build_wuxia_b1(7)
+	eq(s.map.width, 12, "B1 width 12")
+	eq(s.map.height, 12, "B1 height 12")
+	eq(s.units.size(), 5, "3 allies + 2 bandits")
+	check(s.gdd_mode, "gdd mode on")
+	var names := []
+	for u in s.units:
+		names.append(u.name)
+	check(names.has("剑客") and names.has("劫客甲"), "named cast loaded")

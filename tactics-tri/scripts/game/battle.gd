@@ -728,7 +728,7 @@ func _overlay_panel(lines: Array, buttons: Array) -> Control:
 # ================================================================== player states
 
 func _menu_title(u: BattleUnit) -> String:
-	return "%s  ·  技力 %d/%d" % [u.name, u.tp, u.max_tp]
+	return ("%s  ·  AP %d/%d  内力 %d/%d" % [u.name, u.ap, u.max_ap, u.qi, u.max_qi]) if u.use_gdd_rules else ("%s  ·  技力 %d/%d" % [u.name, u.tp, u.max_tp])
 
 
 func _enter_main() -> void:
@@ -740,8 +740,10 @@ func _enter_main() -> void:
 	_clear_hl()
 	move_info = {}
 	var stand: Array = [u.pos]
-	if not state.moved:
+	if state.can_move(u):
 		move_info = state.reachable_for(u)
+	elif state.gdd_mode:
+		move_info = {"cost": {}, "prev": {}, "ends": []}
 		stand = move_info["ends"]
 		for p in stand:
 			if p != u.pos:
@@ -823,8 +825,10 @@ func _on_skills() -> void:
 	for sid in u.skills:
 		var sk := SkillDB.get_skill(sid)
 		var ok := state.skill_usable(u, sid)
-		items.append(["%s  ·  技力%d" % [sk["name"], sk["tp"]], _enter_target.bind(sid), ok])
-		desc += "[color=#ffd27a]%s[/color] (技力%d)%s：%s\n" % [sk["name"], sk["tp"], "" if ok else "[color=#ff8080]技力不足[/color]", sk["desc"]]
+		var cost_txt := ("AP%d 内力%d" % [int(sk.get("ap", 0)), int(sk.get("qi", 0))]) if u.use_gdd_rules else ("技力%d" % sk["tp"])
+		items.append(["%s  ·  %s" % [sk["name"], cost_txt], _enter_target.bind(sid), ok])
+		var need := ("资源不足" if u.use_gdd_rules else "技力不足")
+		desc += "[color=#ffd27a]%s[/color] (%s)%s：%s\n" % [sk["name"], cost_txt, "" if ok else "[color=#ff8080]%s[/color]" % need, sk["desc"]]
 	items.append(["返回", _enter_main, true])
 	_set_menu(items, _menu_title(u))
 	idle_forecast.hide()
@@ -1654,7 +1658,7 @@ func _on_tap(pos: Vector2) -> void:
 	match mode:
 		"main":
 			var u := state.current()
-			if not state.moved and not move_info.is_empty() and (move_info["ends"] as Array).has(cell) and cell != u.pos:
+			if state.can_move(u) and not move_info.is_empty() and (move_info["ends"] as Array).has(cell) and cell != u.pos:
 				_do_move(cell)
 				return
 			if other != null and other.team != u.team and not state.acted and not sel_ground:
@@ -1737,7 +1741,7 @@ func _setup_shot() -> void:
 		state.map.apply_effect(Vector2i(2, 5), "ice")
 	state.current_id = lord.id
 	state.turn_count = 1
-	state.moved = Game.current_battle == "b1"
+	state.moved = Game.current_battle == "b1"  # classic tutorial lock; wuxia_b1 stays false
 	state.move_origin = lord.pos
 	lord.tp = 3
 	_refresh_all()

@@ -54,8 +54,8 @@ func new_game() -> void:
 
 func start_battle_demo() -> void:
 	leader_values = {"ren": 1, "zhi": 1, "yong": 1}
-	step = 1
-	advance()
+	current_battle = "wuxia_b1"
+	_change("battle")
 
 
 func advance() -> void:
@@ -216,9 +216,13 @@ func _do_shot() -> void:
 		"vote":
 			step = 4
 			_change("vote")
-		"battle", "battlemain", "battle2a", "battle2b", "battlefx":
-			step = 6 if shot.begins_with("battle2") else 2
-			current_battle = {"battle": "b1", "battlemain": "b1", "battlefx": "b1", "battle2a": "b2A", "battle2b": "b2B"}[shot]
+		"battle", "battlemain", "battlefx", "wuxia", "wuxia_b1":
+			step = 2
+			current_battle = "wuxia_b1"
+			_change("battle")
+		"battle2a", "battle2b":
+			step = 6
+			current_battle = "b2A" if shot == "battle2a" else "b2B"
 			_change("battle")
 		"ending":
 			vote_result = "B"

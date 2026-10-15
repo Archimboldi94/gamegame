@@ -17,13 +17,10 @@ const DEF_FACTOR := 0.5
 
 ## Which side of the target the attack comes from: "front", "side" or "back".
 static func relative_side(target_pos: Vector2i, target_facing: int, attacker_pos: Vector2i) -> String:
-	var d := attacker_pos - target_pos
-	var f: Vector2i = BattleUnit.DIRS[target_facing]
-	var proj := d.x * f.x + d.y * f.y
-	var lat := absi(d.x * f.y - d.y * f.x)
-	if proj > lat:
+	var delta := posmod(dir_toward(target_pos, attacker_pos, target_facing) - target_facing, 8)
+	if delta <= 1 or delta == 7:
 		return "front"
-	if -proj > lat:
+	if delta >= 3 and delta <= 5:
 		return "back"
 	return "side"
 
@@ -45,13 +42,11 @@ static func max_range(skill: Dictionary, dh: int) -> int:
 	return r
 
 
-static func dir_toward(from: Vector2i, to: Vector2i, fallback := 2) -> int:
+static func dir_toward(from: Vector2i, to: Vector2i, fallback := 4) -> int:
 	var d := to - from
 	if d == Vector2i.ZERO:
 		return fallback
-	if absi(d.x) >= absi(d.y):
-		return 1 if d.x > 0 else 3
-	return 2 if d.y > 0 else 0
+	return posmod(roundi(Vector2(d).angle() / (PI / 4.0)) + 2, 8)
 
 
 static func can_target(map: BattleMap, skill: Dictionary, from: Vector2i, tile: Vector2i) -> bool:
@@ -60,6 +55,23 @@ static func can_target(map: BattleMap, skill: Dictionary, from: Vector2i, tile: 
 	var shape: String = skill["shape"]
 	if shape == "self":
 		return tile == from
+	if bool(skill.get("gdd", false)):
+		var dist8 := Pathing.chebyshev(from, tile)
+		if dist8 < int(skill["rmin"]) or dist8 > int(skill["rmax"]):
+			return false
+		if shape == "leap":
+			return true  # landing/path/occupancy checked by BattleState
+		var d := tile - from
+		if shape == "line" and d.x != 0 and d.y != 0 and absi(d.x) != absi(d.y):
+			return false
+		var step := Vector2i(signi(d.x), signi(d.y))
+		var prev := from
+		for i in range(1, dist8 + 1):
+			var p := from + step * i
+			if not map.is_passable(p) or Pathing.closed_corner(map, prev, p):
+				return false
+			prev = p
+		return true
 	var dist := Pathing.manhattan(from, tile)
 	var dh := map.get_h(from) - map.get_h(tile)
 	if shape == "line2" or shape == "line3":
@@ -71,10 +83,23 @@ static func can_target(map: BattleMap, skill: Dictionary, from: Vector2i, tile: 
 	return true
 
 
-static func affected_tiles(skill: Dictionary, from: Vector2i, tile: Vector2i) -> Array:
+static func affected_tiles(skill: Dictionary, from: Vector2i, tile: Vector2i, map: BattleMap = null) -> Array:
 	match skill["shape"]:
 		"self":
 			return [from]
+		"line":
+			var step := Vector2i(signi(tile.x - from.x), signi(tile.y - from.y))
+			if step == Vector2i.ZERO:
+				return []
+			var out := []
+			var prev := from
+			for i in range(1, int(skill["rmax"]) + 1):
+				var p := from + step * i
+				if map != null and (not map.is_passable(p) or Pathing.closed_corner(map, prev, p)):
+					break
+				out.append(p)
+				prev = p
+			return out
 		"line2", "line3":
 			var n := 2 if skill["shape"] == "line2" else 3
 			var dir := tile - from
@@ -84,7 +109,8 @@ static func affected_tiles(skill: Dictionary, from: Vector2i, tile: Vector2i) ->
 			return out
 		"area1":
 			var out2 := [tile]
-			for d in BattleMap.DIRS:
+			# Classic AoE stays a plus-shape (orthogonal only), even though move uses 8 dirs.
+			for d in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
 				out2.append(tile + d)
 			return out2
 	return [tile]
@@ -92,6 +118,8 @@ static func affected_tiles(skill: Dictionary, from: Vector2i, tile: Vector2i) ->
 
 ## Full preview of one hit. Returns dmg, hit (0-100), side, mult, labels (Chinese tags) and heal flag.
 static func calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: BattleMap, from: Vector2i) -> Dictionary:
+	if att.use_gdd_rules:
+		return gdd_calc(att, tgt, skill, map, from)
 	var kind: String = skill["kind"]
 	var power: float = skill["power"]
 	var res := {"dmg": 0, "hit": 100, "side": "front", "labels": [], "heal": false, "mult": 1.0}
@@ -134,3 +162,25 @@ static func calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: Battl
 		hit += clampi(dh, -HEIGHT_DMG_CAP, HEIGHT_DMG_CAP) * HEIGHT_HIT_STEP
 		res["hit"] = clampi(hit, 5, 100)
 	return res
+
+
+## B1 data gives weapon/skill power plus the unit's strength. No side damage multiplier.
+static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: BattleMap, from: Vector2i, reaction := false) -> Dictionary:
+	var side := relative_side(tgt.pos, tgt.facing, from)
+	var side_hit := 10 if side == "back" else (5 if side == "side" else 0)
+	var hit := int(skill.get("base_hit", 90)) + att.acc - tgt.eva - map.evasion(tgt.pos) + side_hit
+	if reaction:
+		hit -= 10
+	var armor := maxi(0, tgt.def + (2 if tgt.block else 0) - int(skill.get("pierce", 0)))
+	var power := att.atk + int(skill["power"])
+	var damage := maxi(1, power - armor)
+	if tgt.guard:
+		damage = maxi(1, floori(damage * 0.75))
+	var labels := []
+	if side_hit > 0:
+		labels.append(("背后" if side == "back" else "侧面") + " 命中+%d%%" % side_hit)
+	if tgt.guard:
+		labels.append("护势 -25%（一击）")
+	if tgt.block:
+		labels.append("格挡 护甲+2（一击）")
+	return {"dmg": damage, "hit": clampi(hit, 10, 95), "side": side, "labels": labels, "heal": false, "mult": 0.75 if tgt.guard else 1.0}

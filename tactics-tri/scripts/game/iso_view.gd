@@ -8,8 +8,8 @@ const TH := 80.0
 const HS := 40.0
 const DIAMOND := [Vector2(0, -TH * 0.5), Vector2(TW * 0.5, 0), Vector2(0, TH * 0.5), Vector2(-TW * 0.5, 0)]
 const ISO_DIR := [
-	Vector2(0.894, -0.447), Vector2(0.894, 0.447),
-	Vector2(-0.894, 0.447), Vector2(-0.894, -0.447),
+	Vector2(0.894, -0.447), Vector2(1, 0), Vector2(0.894, 0.447), Vector2(0, 1),
+	Vector2(-0.894, 0.447), Vector2(-1, 0), Vector2(-0.894, -0.447), Vector2(0, -1),
 ]
 
 var yaw := 0
@@ -72,7 +72,7 @@ func cursor_z(p: Vector2i) -> int:
 
 
 func facing_view(facing: int) -> int:
-	return posmod(facing + yaw, 4)
+	return posmod(facing - yaw * 2, 8)
 
 
 func screen_dir(facing: int) -> Vector2:
@@ -80,8 +80,7 @@ func screen_dir(facing: int) -> Vector2:
 
 
 func faces_left(facing: int) -> bool:
-	var fv := facing_view(facing)
-	return fv == 2 or fv == 3
+	return screen_dir(facing).x < 0
 
 
 ## Hit-test against one isometric column (top diamond + side faces), local space.

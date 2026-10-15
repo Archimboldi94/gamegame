@@ -1,9 +1,8 @@
 class_name BattleUnit
 extends RefCounted
 
-## Facing indices: 0 = 北 (-y), 1 = 东 (+x), 2 = 南 (+y), 3 = 西 (-x)
-const DIRS := [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
-const DIR_NAMES := ["北", "东", "南", "西"]
+const DIRS := BattleMap.DIRS
+const DIR_NAMES := ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
 const PLAYER := 0
 const ENEMY := 1
 
@@ -25,8 +24,18 @@ var jump := 1
 var eva := 0
 var tp := 1
 var max_tp := 5
+var use_gdd_rules := false
+var ap := 6
+var max_ap := 6
+var qi := 12
+var max_qi := 12
+var rp := 1
+var acc := 0
+var block := false
+var used_skills: Dictionary = {}
+var ap_penalty := 0
 var pos := Vector2i.ZERO
-var facing := 2
+var facing := 4
 var basic := "slash"
 var skills: Array = []
 var is_leader := false
@@ -37,7 +46,7 @@ var flying := false  # only flying units may cross deep water / rivers
 var ai := "aggressive"
 
 
-static func create(p_id: int, p_name: String, p_cls: String, p_team: int, p_pos: Vector2i, p_facing := 2, bonus := {}) -> BattleUnit:
+static func create(p_id: int, p_name: String, p_cls: String, p_team: int, p_pos: Vector2i, p_facing := 4, bonus := {}) -> BattleUnit:
 	var u := BattleUnit.new()
 	var c: Dictionary = UnitClasses.get_class_data(p_cls)
 	u.id = p_id

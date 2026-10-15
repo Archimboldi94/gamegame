@@ -15,7 +15,9 @@ static func climb_extra(dh: int) -> int:
 
 ## Movement cost to step from `from` to the adjacent tile `to`, or -1 if blocked by terrain/height.
 static func enter_cost(map: BattleMap, jump: int, from: Vector2i, to: Vector2i, flying := false) -> int:
-	if not map.is_passable(to, flying):
+	if not map.in_bounds(from) or chebyshev(from, to) != 1 or not map.is_passable(to, flying):
+		return -1
+	if closed_corner(map, from, to, flying):
 		return -1
 	var dh := map.get_h(to) - map.get_h(from)
 	if dh > jump:
@@ -23,6 +25,12 @@ static func enter_cost(map: BattleMap, jump: int, from: Vector2i, to: Vector2i, 
 	if -dh > jump + DROP_EXTRA:
 		return -1
 	return map.move_cost(to, flying) + climb_extra(dh)
+
+
+## Only a pair of solid side cells seals a diagonal; one obstacle permits passing its edge.
+static func closed_corner(map: BattleMap, from: Vector2i, to: Vector2i, flying := false) -> bool:
+	var d := to - from
+	return d.x != 0 and d.y != 0 and not map.is_passable(from + Vector2i(d.x, 0), flying) and not map.is_passable(from + Vector2i(0, d.y), flying)
 
 
 ## Dijkstra flood fill. Returns {"cost": {pos: int}, "prev": {pos: pos}, "ends": [pos...]}
@@ -46,7 +54,7 @@ static func search(map: BattleMap, unit: BattleUnit, units: Array, max_cost: int
 			if not map.in_bounds(nx):
 				continue
 			var o = occ.get(nx)
-			if o != null and o.team != unit.team:
+			if o != null and (unit.use_gdd_rules or o.team != unit.team):
 				continue
 			var c := enter_cost(map, unit.jump, cur, nx, unit.flying)
 			if c < 0:
@@ -54,7 +62,13 @@ static func search(map: BattleMap, unit: BattleUnit, units: Array, max_cost: int
 			var nc: int = int(cost[cur]) + c
 			if nc > max_cost:
 				continue
-			if not cost.has(nx) or nc < int(cost[nx]):
+			var better := not cost.has(nx) or nc < int(cost[nx])
+			if not better and nc == int(cost.get(nx, -1)):
+				# Prefer orthogonal last-steps so facing stays cardinal when possible.
+				var old_d: Vector2i = nx - prev[nx]
+				var new_d: Vector2i = nx - cur
+				better = (new_d.x == 0 or new_d.y == 0) and not (old_d.x == 0 or old_d.y == 0)
+			if better:
 				cost[nx] = nc
 				prev[nx] = cur
 				if not open.has(nx):
@@ -82,3 +96,7 @@ static func path_to(result: Dictionary, start: Vector2i, goal: Vector2i) -> Arra
 
 static func manhattan(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
+
+
+static func chebyshev(a: Vector2i, b: Vector2i) -> int:
+	return maxi(absi(a.x - b.x), absi(a.y - b.y))

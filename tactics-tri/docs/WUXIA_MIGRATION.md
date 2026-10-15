@@ -1,0 +1,89 @@
+# 武侠战棋迁移计划（tactics-tri → GDD v2.0）
+
+- 日期：2026-10-15
+- 基线工程：`tactics-tri`（Claude 等距 UI / 美术管线）
+- 规则权威：`wuxia-tactics/02_当前设计文档/武侠战棋_GDD_v2.0.md`（【已定】必须实现；【建议】可调）
+- 参考实现（仅规则/数据，不整体搬 UI）：`wuxia-tactics/01_Godot工程/WuxiaTactics_Core_v2.0/`
+- 旧 README / 天平之誓剧情：可忽略；投票抉择、多战程故事可后置
+
+## 1. 保留（tactics-tri 优势）
+
+| 模块 | 路径 | 原因 |
+|------|------|------|
+| 等距渲染 | `scripts/game/iso_view.gd`, `tile_node.gd`, `unit_node.gd` | 斜 45° 观感已达标，GDD 亦要求斜视 |
+| 战斗场景编排 | `scripts/game/battle.gd` | HUD、输入、动画编排完整 |
+| HUD / UI | `battle_unit_panel.gd`, `ui_kit.gd`, `tile_cursor.gd` | 情境型面板基础好，可按 v1.9 HUD 规范微调 |
+| 特效 / 音效 | `battle_fx.gd`, `audio/` | 占位可用，后续换武学特效 |
+| 美术管线 | `art/`, `assets/`, 林砚武侠试制 | 精致像素方向一致 |
+| 无场景规则层 | `scripts/rules/*` | 已与表现分离，适合改规则而不推倒 UI |
+| 自动化测试入口 | `tests/run_tests.gd` | 继续扩展 |
+
+## 2. 必须改（对齐 GDD【已定】）
+
+### 2.1 网格与移动
+- **现状**：`BattleMap.DIRS` / `BattleUnit.DIRS` 仅四向；`mov` 点一次移动 + `moved/acted` 开关。
+- **目标**：正方形格 + **八向**（含斜向）；普通地形横/竖/斜各 **1AP**；禁止两阻挡构成的封闭墙角斜穿。
+- **改动点**：`battle_map.gd`, `battle_unit.gd`, `pathing.gd`, `iso_view` 邻接高亮。
+
+### 2.2 行动资源
+- **现状**：CTB/速度条 + 每回合 mov/act；`tp` 技能点。
+- **目标**：速度排序队列；每次自身行动 **6AP【建议】** 不结转；**内力** 上限 12、行动开始 +1、调息 3AP/+4；可任意穿插移动与出招。
+- **改动点**：`battle_unit.gd`（`ap`, `neili`/`qi`, `rp`）；`battle_state.gd`（扣 AP、行动开始恢复）；`turn_order.gd` 简化为速度队列轮转。
+
+### 2.3 命中 / 伤害
+- **现状**：`combat.gd` 有侧背伤害加成与高度修正；面向仅四向。
+- **目标**：概率命中【已定】；【建议】`clamp(基础命中+命中-闪避+侧背+地形, 10%, 95%)`；命中后 `max(1, floor((atk+weapon)*倍率 - armor))`，护势 0.75；**初版侧背只改命中、不加伤害倍率**【建议】。高度差可降级为可选/后置（B1 地图平坦）。
+- **改动点**：`combat.gd`；八向 `relative_side`。
+
+### 2.4 控制区 / 反击 / 借机【已定机制】
+- **现状**：无 ZoC、无 RP、无自动反击。
+- **目标**：正侧 5 邻格控制区；每轮 1 RP；离区借机；受击自动反击（非背后）；反应不链锁。
+- **改动点**：新建 `scripts/rules/control_zone.gd`；在 `battle_state.move_unit` 逐步结算借机；`use_skill` 后结算反击；UI 预览危险格。
+
+### 2.5 武学槽
+- **现状**：职业技能表 `skill_db.gd` / `unit_classes.gd`（天平之誓职业）。
+- **目标**：3 主动招式 + 1 内功 + 1 轻功【已定】；B1 先用 Core 的 `b1_combat.json` 技能集（破风剑、回锋剑、燕行步、调息等）作数据源，迁到 `tactics-tri/data/` 或 `scripts/rules/wuxia_*`。
+- **改动点**：`skill_db.gd` 扩展字段（ap/qi/shape）；单位创建改武侠原型角色。
+
+### 2.6 关卡 B1《青崖渡·渡口截箱》
+- **现状**：`battle_defs.gd` 的 `b1` 是青石渡石桥（10×10 高度图 + 鸦卒）。
+- **目标**：接入 `青崖渡_关卡蓝图_v1.3.json` / Core `b1_map.json`（12×12、水域/箱/木箱、markers A/B/D 与 1/2）；胜负：歼灭两名劫客 / 我方关键倒地。
+- **改动点**：`battle_defs.gd` 增 `wuxia_b1` 或替换首关；地图加载器读 JSON；标题入口指向新 B1。
+
+## 3. 可后置（本 Phase 不做或仅占位）
+
+- 客栈自由探索、谱库、成长、保存
+- 完整剧情 / 投票抉择（保留代码，入口可藏）
+- 内功被动细则、全兵器分支平衡
+- 精致武学特效与正式像素立绘（占位圆形/剪影可继续）
+- Core_v2.0 整套场景脚本（禁止 wholesale 覆盖）
+
+## 4. Phase A 实施顺序（本轮）
+
+1. **文档**：本迁移计划落盘。
+2. **规则层最小对齐**  
+   - DIRS → 8 向；facing 0..7。  
+   - Unit：`ap/max_ap`, `qi/max_qi`, `rp`；行动开始恢复。  
+   - Pathing：八向、1AP/格、封闭角禁斜穿；移动逐步扣 AP。  
+   - Combat：GDD 命中/伤害建议公式；去掉强制侧背伤害倍率（或开关）。  
+   - ControlZone + 借机/反击接入 `BattleState`。  
+3. **数据**：复制/引用 B1 map+combat JSON 到 `tactics-tri/data/wuxia/`；`BattleDefs` 增加 `wuxia_b1`。  
+4. **表现最小接线**：`battle.gd` 能开 `wuxia_b1`、显示 AP/内力、移动后刷新；不重做 HUD 美观。  
+5. **测试**：扩展 `run_tests.gd`（八向、AP、ZoC、反击、B1 可达）；修回归。  
+6. **截图**：Godot 启动 B1，截图到 `/workspace/tactics-tri-wuxia-shots/`。  
+7. **Git**：中文 commit 推送；更新 `wuxia-tactics/DEV_STATUS.md` 标明基线已切到 tactics-tri。
+
+## 5. 风险与注意事项
+
+- 八向 + AP 穿插会破坏现有「先移动再攻击一次」的 UI 状态机，需在 `battle.gd` 把 `moved/acted` 改为「AP 余额驱动」。
+- 等距渲染假设四向邻接时，斜向高亮/路径折线要验证。
+- 勿从 Core 复制 `BattleUI.gd` 覆盖现有 HUD。
+- 旧关卡 `b1/b2A/b2B` 可保留为回归测试地图，主入口改武侠 B1。
+
+## 6. 成功标准（Phase A）
+
+- [x] 文档已提交  
+- [x] headless 原有测试 + 新规则测试通过（2282 PASS）  
+- [x] 能在 Godot 中打开武侠 B1 并截到等距画面  
+- [x] 规则层具备 AP / 八向 / ZoC·反击 的可测实现（即使 AI/招式未全满）  
+- [x] DEV_STATUS 写明基线切换  

@@ -22,7 +22,7 @@ var view: IsoView
 
 static func tex(path: String) -> Texture2D:
 	if not textures.has(path):
-		textures[path] = load(path)
+		textures[path] = load(path) if ResourceLoader.exists(path) else null
 	return textures[path]
 
 
@@ -50,13 +50,21 @@ func contains_local(l: Vector2) -> bool:
 
 
 func _draw() -> void:
-	var art := "water" if terrain == "ford" else terrain
+	var info := Terrain.info(terrain)
+	var art: String = "water" if terrain == "ford" else String(info.get("art", terrain))
+	if not ResourceLoader.exists("res://assets/tiles/top_%s_0.png" % art):
+		art = "grass"
 	var side := tex("res://assets/tiles/side_%s.png" % art)
 	for i in range(h, 0, -1):
-		draw_texture(side, Vector2(-TW * 0.5, i * HS))
-	draw_texture(tex("res://assets/tiles/sidetop_%s.png" % art), Vector2(-TW * 0.5, 0))
+		if side:
+			draw_texture(side, Vector2(-TW * 0.5, i * HS))
+	var sidetop := tex("res://assets/tiles/sidetop_%s.png" % art)
+	if sidetop:
+		draw_texture(sidetop, Vector2(-TW * 0.5, 0))
 	var variant := posmod(cell.x * 7 + cell.y * 11, 4)
-	draw_texture(tex("res://assets/tiles/top_%s_%d.png" % [art, variant]), Vector2(-TW * 0.5, -TH * 0.5))
+	var top := tex("res://assets/tiles/top_%s_%d.png" % [art, variant])
+	if top:
+		draw_texture(top, Vector2(-TW * 0.5, -TH * 0.5))
 	if terrain == "water":
 		_deep_water()
 	elif terrain == "ford":

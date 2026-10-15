@@ -2,7 +2,11 @@ class_name BattleMap
 extends RefCounted
 ## Grid of tiles with integer heights, terrain types and temporary effects (fire / ice).
 
-const DIRS := [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+## GDD clockwise indices: N, NE, E, SE, S, SW, W, NW.
+const DIRS := [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1),
+	Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)]
+
+var markers: Dictionary = {}
 
 var width := 0
 var height := 0
@@ -23,6 +27,21 @@ static func from_rows(height_rows: Array, terrain_rows: Array) -> BattleMap:
 			m.terrains.append(Terrain.CODES[tr.substr(x, 1)])
 	return m
 
+
+
+static func from_char_grid(rows: Array, markers := {}) -> BattleMap:
+	var m := BattleMap.new()
+	m.height = rows.size()
+	m.width = String(rows[0]).length()
+	m.markers = markers.duplicate(true)
+	for y in m.height:
+		var row := String(rows[y])
+		for x in m.width:
+			var ch := row.substr(x, 1)
+			var terrain: String = Terrain.CODES.get(ch, "grass")
+			m.heights.append(0)
+			m.terrains.append(terrain)
+	return m
 
 static func flat(w: int, h: int, terrain := "grass") -> BattleMap:
 	var m := BattleMap.new()

@@ -9,6 +9,9 @@ const SAVE_NO_MOVE := 20
 const SAVE_NO_ACT := 20
 
 var entries: Dictionary = {}  # id -> {"spd": int, "ct": int}
+var use_rounds := false
+var round_number := 0
+var round_queue: Array = []
 
 
 static func cost_for(moved: bool, acted: bool) -> int:
@@ -26,6 +29,7 @@ func add(id: int, spd: int, ct := 0) -> void:
 
 func remove(id: int) -> void:
 	entries.erase(id)
+	round_queue.erase(id)
 
 
 func has(id: int) -> bool:
@@ -64,6 +68,12 @@ func _better(a: int, b: int) -> bool:
 func next_actor() -> int:
 	if entries.is_empty():
 		return -1
+	if use_rounds:
+		if round_queue.is_empty():
+			round_number += 1
+			round_queue = entries.keys()
+			round_queue.sort_custom(func(a, b): return entries[a]["spd"] > entries[b]["spd"] if entries[a]["spd"] != entries[b]["spd"] else a < b)
+		return round_queue[0]
 	var r := _ready_ids()
 	if r.is_empty():
 		var min_t := 1 << 30
@@ -79,6 +89,9 @@ func next_actor() -> int:
 
 
 func end_turn(id: int, cost: int) -> void:
+	if use_rounds:
+		round_queue.erase(id)
+		return
 	if entries.has(id):
 		entries[id]["ct"] -= cost
 
@@ -86,6 +99,9 @@ func end_turn(id: int, cost: int) -> void:
 func duplicate_order() -> TurnOrder:
 	var t := TurnOrder.new()
 	t.entries = entries.duplicate(true)
+	t.use_rounds = use_rounds
+	t.round_number = round_number
+	t.round_queue = round_queue.duplicate()
 	return t
 
 

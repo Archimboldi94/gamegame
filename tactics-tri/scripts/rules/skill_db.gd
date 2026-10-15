@@ -39,8 +39,51 @@ const SKILLS := {
 	"axe": {"name": "裂地斧", "power": 1.1, "desc": "沉重的斧击。"},
 }
 
+static var wuxia_skills: Dictionary = {}
+
+
+static func _load_wuxia() -> void:
+	if not wuxia_skills.is_empty():
+		return
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_combat.json"))
+	for name in data["skills"]:
+		var spec: Dictionary = data["skills"][name]
+		var sk := DEFAULTS.duplicate()
+		sk.merge(spec, true)
+		sk.merge({"id": name, "name": name, "gdd": true, "rmax": int(spec.get("range", 1)), "shape": "single", "kind": "phys"}, true)
+		match spec["kind"]:
+			"line_aoe", "spear", "push_spear", "seal":
+				sk["shape"] = "line" if spec["kind"] != "seal" else "single"
+			"shield", "guard", "rest":
+				sk.merge({"kind": "self", "shape": "self", "rmin": 0, "rmax": 0, "power": 0, "effect": spec["kind"]}, true)
+			"leap":
+				sk.merge({"kind": "self", "shape": "leap", "rmax": 3, "power": 0, "effect": "leap", "once": true}, true)
+			"push":
+				sk["effect"] = "wuxia_push"
+			"melee_retreat":
+				sk["effect"] = "retreat"
+		if spec["kind"] == "push_spear":
+			sk["effect"] = "wuxia_push"
+		if spec["kind"] == "seal":
+			sk["effect"] = "seal"
+		if spec["kind"] == "rest":
+			sk["once"] = true
+		var descriptions := {
+			"普攻": "攻击相邻敌人。", "破风剑": "沿八向直线攻击至多3格；实体障碍挡线，破甲1。",
+			"回锋剑": "命中后安全后撤一格；每次行动至多后撤一次。", "穿云枪": "直线攻击至多2格，破甲1。",
+			"挑枪": "直线攻击至多2格，命中后击退一格。", "震山掌": "命中后击退一格。",
+			"截脉指": "命中后使目标下次行动少1AP，不叠加。", "守关式": "护势：下一次命中伤害减免25%；与格挡互斥。",
+			"防御": "格挡：下一次命中时护甲+2；与护势互斥。", "调息": "恢复4点内力，每次行动限一次。",
+			"燕行步": "沿合法路径移动至多3步，免离区借机；每次行动限一次。暂不跨越障碍。",
+		}
+		sk["desc"] = descriptions.get(name, name)
+		wuxia_skills[name] = sk
+
 
 static func get_skill(id: String) -> Dictionary:
+	if not SKILLS.has(id):
+		_load_wuxia()
+		return wuxia_skills[id].duplicate(true)
 	var d: Dictionary = DEFAULTS.duplicate()
 	d.merge(SKILLS[id], true)
 	d["id"] = id
@@ -48,4 +91,5 @@ static func get_skill(id: String) -> Dictionary:
 
 
 static func has_skill(id: String) -> bool:
-	return SKILLS.has(id)
+	_load_wuxia()
+	return SKILLS.has(id) or wuxia_skills.has(id)
