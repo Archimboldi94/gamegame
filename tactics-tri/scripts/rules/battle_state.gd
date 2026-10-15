@@ -211,6 +211,82 @@ func can_undo_move() -> bool:
 	return moved and not acted
 
 
+## Read-only path risk, sharing geometry and reactor priority with actual movement.
+## A reactor can spend its RP only once across the entire path.
+func path_reactions(u: BattleUnit, path: Array, immune := false, initial_facing := -1) -> Array:
+	var out := []
+	var spent := {}
+	if not u.use_gdd_rules or immune:
+		return out
+	for i in range(1, path.size()):
+		var sources := ControlZone.leaving_sources(u, path[i - 1], path[i], units, map)
+		for source in sources:
+			if spent.has(source.id):
+				continue
+			spent[source.id] = true
+			# The mover faces the preceding step when the reaction happens.
+			var subject := BattleUnit.new()
+			subject.pos = path[i - 1]
+			subject.facing = (u.facing if initial_facing < 0 else initial_facing) if i == 1 else Combat.dir_toward(path[i - 2], path[i - 1])
+			subject.def = u.def
+			subject.eva = u.eva
+			subject.guard = u.guard
+			subject.block = u.block
+			var e := Combat.gdd_calc(source, subject, SkillDB.get_skill(source.basic), map, source.pos, true)
+			e.merge({"source": source, "from": path[i - 1], "to": path[i], "step": i})
+			out.append(e)
+			break
+	return out
+
+
+## Auto-counter eligibility on hit/miss, including knockback and free retreat.
+## All values are conditional on surviving any preceding reactions.
+func counter_preview(u: BattleUnit, sid: String, target: BattleUnit) -> Dictionary:
+	var sk := SkillDB.get_skill(sid)
+	if not u.use_gdd_rules or sk["shape"] != "single" or not ControlZone.can_react(target, u, map, u.pos):
+		return {}
+	var attack := Combat.calc(u, target, sk, map, u.pos)
+	var branches := []
+	var forecast := {}
+	for landed in [true, false]:
+		if landed and int(attack["dmg"]) >= target.hp:
+			continue
+		var defender := BattleUnit.new()
+		defender.pos = target.pos
+		defender.facing = target.facing
+		defender.team = target.team
+		defender.basic = target.basic
+		defender.atk = target.atk
+		defender.acc = target.acc
+		var subject := BattleUnit.new()
+		subject.pos = u.pos
+		subject.facing = Combat.dir_toward(u.pos, target.pos, u.facing)
+		subject.team = u.team
+		subject.def = u.def
+		subject.eva = u.eva
+		subject.guard = u.guard
+		subject.block = u.block
+		if landed and sk.get("effect") == "wuxia_push":
+			var dest := target.pos + Vector2i(signi(target.pos.x - u.pos.x), signi(target.pos.y - u.pos.y))
+			if Pathing.enter_cost(map, target.jump, target.pos, dest, target.flying) >= 0 and unit_at(dest) == null:
+				defender.pos = dest
+		if sk.get("effect") == "retreat":
+			var path := retreat_path(u, target.pos)
+			if not path.is_empty():
+				var dest: Vector2i = path[1]
+				var sources := ControlZone.leaving_sources(u, u.pos, dest, units, map)
+				if not bool(sk.get("retreat_safe", false)) and not sources.is_empty() and sources[0] == target:
+					continue  # target spent its RP on retreat's opportunity attack
+				subject.pos = dest
+		if not ControlZone.can_react(defender, subject, map, subject.pos):
+			continue
+		branches.append("命中后" if landed else "落空后")
+		forecast = Combat.gdd_calc(defender, subject, SkillDB.get_skill(target.basic), map, defender.pos, true)
+	if not branches.is_empty():
+		forecast["condition"] = "双方存活时" if branches.size() == 2 else branches[0] + "且双方存活时"
+	return forecast
+
+
 func undo_move() -> void:
 	var u := current()
 	if u == null or not can_undo_move():
@@ -434,12 +510,10 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 
 
 func _retreat(u: BattleUnit, sk: Dictionary, target: Vector2i) -> Array:
-	if not u.alive() or u.used_skills.get("retreat", false):
+	var path := retreat_path(u, target)
+	if path.is_empty():
 		return []
-	var step := Vector2i(signi(u.pos.x - target.x), signi(u.pos.y - target.y))
-	var dest := u.pos + step
-	if Pathing.enter_cost(map, u.jump, u.pos, dest, u.flying) < 0 or unit_at(dest) != null:
-		return []
+	var dest: Vector2i = path[1]
 	u.used_skills["retreat"] = true
 	var events := []
 	if not bool(sk.get("retreat_safe", false)):
@@ -451,6 +525,15 @@ func _retreat(u: BattleUnit, sk: Dictionary, target: Vector2i) -> Array:
 		u.pos = dest
 		events.append({"type": "retreat", "unit": u, "from": old, "to": dest})
 	return events
+
+
+func retreat_path(u: BattleUnit, target: Vector2i) -> Array:
+	if not u.alive() or u.used_skills.get("retreat", false):
+		return []
+	var dest := u.pos + Vector2i(signi(u.pos.x - target.x), signi(u.pos.y - target.y))
+	if Pathing.enter_cost(map, u.jump, u.pos, dest, u.flying) < 0 or unit_at(dest) != null:
+		return []
+	return [u.pos, dest]
 
 
 ## GDD forced movement: eight directions, no collision or falling bonus damage, no ZoC.

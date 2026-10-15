@@ -15,6 +15,10 @@ const COL_REACH := Color(0.88, 0.54, 0.35, 0.73)
 const COL_HEAL := Color(0.53, 0.80, 0.51, 0.25)
 const COL_AREA := Color(0.94, 0.80, 0.39, 0.30)
 const COL_DANGER := Color(0.90, 0.60, 0.31, 0.22)
+const COL_ZOC := Color(0.88, 0.48, 0.90, 0.30)
+const COL_ZOC_SPENT := Color(0.48, 0.39, 0.51, 0.19)
+const COL_PATH := Color(0.65, 0.94, 0.92, 0.42)
+const COL_PATH_RISK := Color(1.0, 0.18, 0.15, 0.65)
 const COL_PLAYER := Color(0.55, 0.78, 1.0)
 const COL_ENEMY := Color(1.0, 0.55, 0.5)
 const TAG_COLORS := {"背后": "#ff7060", "侧面": "#ffb347", "夹击": "#d0a0ff", "守势": "#b0b0b0"}
@@ -79,6 +83,8 @@ var target_set: Array = []
 var focus_cell := NONE
 var cam_follow: Node2D
 var autoplay_turns := 0
+var move_preview_cell := NONE
+var pending_move := NONE
 
 var touches := {}
 var tap_start := Vector2.ZERO
@@ -104,7 +110,12 @@ func _ready() -> void:
 	_refresh_all()
 	AudioManager.play_bgm("bgm_battle_loop")
 	AudioManager.play_ambience("amb_night_wind")
-	if Game.shot.begins_with("battle"):
+	if Game.shot in ["wuxia", "wuxia_b1"]:
+		state.begin_next_turn()
+		_refresh_all()
+		_set_active(state.current())
+		_enter_main()
+	elif Game.shot.begins_with("battle"):
 		_setup_shot()
 	elif Game.autoplay != "":
 		Engine.time_scale = 4.0
@@ -273,6 +284,8 @@ func _build_ui() -> void:
 	info_hp.add_theme_stylebox_override("background", UIKit.color_box(Color(0, 0, 0, 0.7), 6))
 	iv.add_child(info_hp)
 	info_text = UIKit.rich(28)
+	if state.gdd_mode:
+		info_text.add_theme_font_size_override("normal_font_size", 26)
 	info_text.custom_minimum_size = Vector2(540, 0)
 	iv.add_child(info_text)
 	bottom.add_child(_spacer())
@@ -280,6 +293,9 @@ func _build_ui() -> void:
 	preview_panel.size_flags_vertical = Control.SIZE_SHRINK_END
 	bottom.add_child(preview_panel)
 	preview_text = UIKit.rich(30)
+	if state.gdd_mode:
+		preview_text.add_theme_font_size_override("normal_font_size", 26)
+		preview_text.add_theme_font_size_override("bold_font_size", 26)
 	preview_text.custom_minimum_size = Vector2(760, 0)
 	preview_panel.add_child(preview_text)
 	preview_panel.visible = false
@@ -337,7 +353,8 @@ func _refresh_timeline() -> void:
 	var cur := state.current()
 	if cur != null:
 		var player := cur.team == BattleUnit.PLAYER
-		turn_label.text = "第 %d 手 · %s：%s" % [state.turn_count, "我方回合" if player else "敌方回合", cur.name]
+		turn_label.text = ("第%d轮 · 当前行动者：%s" % [maxi(1, state.order.round_number), cur.name]) if state.gdd_mode else ("第 %d 手 · %s：%s" % [state.turn_count, "我方回合" if player else "敌方回合", cur.name])
+		turn_label.tooltip_text = "每轮按速度从高到低排序，每人行动一次；速度不增加AP或RP。" if state.gdd_mode else ""
 		turn_label.add_theme_color_override("font_color", COL_PLAYER if player else COL_ENEMY)
 	var ids := state.turn_preview(8)
 	for i in ids.size():
@@ -376,7 +393,7 @@ func _show_info(u: BattleUnit) -> void:
 	info_hp.visible = true
 	var bar := Color(0.35, 0.9, 0.4) if ratio > 0.5 else (Color(1.0, 0.8, 0.25) if ratio > 0.25 else Color(1.0, 0.3, 0.25))
 	info_hp.add_theme_stylebox_override("fill", UIKit.color_box(bar, 6))
-	var resource := "AP [color=#8cf]%d/%d[/color]  内力 %d/%d  RP %d" % [u.ap, u.max_ap, u.qi, u.max_qi, u.rp] if u.use_gdd_rules else "TP [color=#8cf]%s[/color]" % tp
+	var resource := "TP [color=#8cf]%s[/color]" % tp
 	var status := ""
 	if u.guard:
 		status += "   [color=#ffd27a][%s][/color]" % ("护势" if u.use_gdd_rules else "守势")
@@ -384,11 +401,26 @@ func _show_info(u: BattleUnit) -> void:
 		status += "   [color=#ffd27a][格挡][/color]"
 	if u.use_gdd_rules and (u.ap_penalty > 0 or u.qi_blocked):
 		status += "   [color=#ffb080][气脉受阻][/color]"
-	var t := "HP [color=#9f9]%d[/color]/%d    %s%s\n" % [
-		u.hp, u.max_hp, resource, status]
-	t += "攻%d 防%d 魔%d 抗%d 速%d  移%d 跳%d  朝向%s\n" % [
-		u.atk, u.def, u.mag, u.res, u.spd, u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing]]
+	if u.use_gdd_rules:
+		var names := []
+		if u.guard:
+			names.append("护势")
+		if u.block:
+			names.append("格挡")
+		if u.ap_penalty > 0 or u.qi_blocked:
+			names.append("气脉受阻")
+		status = " [color=#ffd27a]%s[/color]" % "·".join(names) if not names.is_empty() else ""
+	var t := "HP [color=#9f9]%d[/color]/%d    %s%s\n" % [u.hp, u.max_hp, resource, status]
+	if u.use_gdd_rules:
+		t = "气血 [color=#9f9]%d[/color]/%d  内力 %d/%d%s\n" % [u.hp, u.max_hp, u.qi, u.max_qi, status]
+		t += "AP [color=#8cf]%s %d/%d[/color]  RP 反应 %d/1\n" % [_ap_cells(u), u.ap, u.max_ap, u.rp]
+		t += "劲力%d 护体%d 眼力%+d 身法%d 速度%d\n" % [u.atk, u.def, u.acc, u.eva, u.spd]
+	else:
+		t += "攻%d 防%d 魔%d 抗%d 速%d  移%d 跳%d  朝向%s\n" % [
+			u.atk, u.def, u.mag, u.res, u.spd, u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing]]
 	t += _terrain_text(u.pos)
+	if u.use_gdd_rules:
+		info_text.tooltip_text = "朝向%s · 速度仅影响行动排序，不增加AP或RP。" % BattleUnit.DIR_NAMES[u.facing]
 	info_text.text = t
 
 
@@ -397,10 +429,13 @@ func _show_tile_info(p: Vector2i) -> void:
 	info_hp.visible = false
 	info_name.text = "[b]%s[/b]" % Terrain.info(state.map.get_terrain(p))["name"]
 	info_text.text = _terrain_text(p)
+	info_text.tooltip_text = ""
 
 
 func _terrain_text(p: Vector2i) -> String:
 	var tinfo := Terrain.info(state.map.get_terrain(p))
+	if state.gdd_mode:
+		return ("地形：%s  移动%dAP  命中修正%+d%%" % [tinfo["name"], state.map.move_cost(p), -state.map.evasion(p)]) if tinfo["pass"] else ("地形：%s  [color=#ff9a80]无法进入[/color]" % tinfo["name"])
 	if not tinfo["pass"]:
 		return "地形：%s  高度%d  [color=#ff9a80]无法进入[/color]%s" % [
 			tinfo["name"], state.map.get_h(p), "（仅飞行单位可越过）" if tinfo.get("fly", false) else ""]
@@ -423,16 +458,38 @@ func _skill_cost(sk: Dictionary) -> String:
 
 func _skill_heading(sk: Dictionary) -> void:
 	preview_text.text = "[b]%s[/b]  %s\n%s" % [sk["name"], _skill_cost(sk), sk["desc"]]
+	if state.gdd_mode:
+		preview_text.text += "\n" + _resources_after(sk)
 	preview_panel.show()
+
+
+func _ap_cells(u: BattleUnit) -> String:
+	return "■".repeat(clampi(u.ap, 0, u.max_ap)) + "□".repeat(maxi(0, u.max_ap - u.ap))
+
+
+func _resources_after(sk: Dictionary) -> String:
+	var u := state.current()
+	var qi_after := maxi(0, u.qi - int(sk.get("qi", 0)))
+	if sk.get("effect") == "rest":
+		qi_after = mini(u.max_qi, qi_after + 4)
+	return "施展后 AP %d/%d · 内力 %d/%d" % [maxi(0, u.ap - int(sk.get("ap", 0))), u.max_ap, qi_after, u.max_qi]
 
 
 ## items: [[text, callable, enabled], ...]
 func _set_menu(items: Array, title := "") -> void:
 	UIKit.clear(menu_box)
 	for it in items:
-		var b := UIKit.button(it[0], it[1], MENU_W, MENU_H)
-		b.disabled = not it[2]
+		var compact: bool = state.gdd_mode and items.size() > 4
+		var b := UIKit.button(it[0], it[1], MENU_W, 56.0 if compact else MENU_H)
 		menu_box.add_child(b)
+		if compact:
+			b.add_theme_font_size_override("font_size", 26)
+			for button_state in ["normal", "hover", "pressed", "disabled"]:
+				var style := b.get_theme_stylebox(button_state).duplicate()
+				style.content_margin_top = 6.0
+				style.content_margin_bottom = 6.0
+				b.add_theme_stylebox_override(button_state, style)
+		b.disabled = not it[2]
 	menu_title.text = title
 	menu_title.visible = title != ""
 	menu_panel.visible = not items.is_empty()
@@ -551,7 +608,7 @@ func _toggle_speed() -> void:
 
 func _show_intro() -> void:
 	mode = "intro"
-	overlay = _overlay_panel([
+	var lines := [
 		[def["name"], 56, Color(1, 0.88, 0.6)],
 		["胜利条件：" + def["win_text"], 34, Color(0.75, 0.95, 0.75)],
 		["败北条件：" + def["lose_text"], 34, Color(1, 0.7, 0.65)],
@@ -559,7 +616,20 @@ func _show_intro() -> void:
 		["单指拖动平移 · 双指捏合缩放 · 左右转90°看清被挡住的格子", 28, Color(0.9, 0.9, 0.95)],
 		["从背后、侧面、高处攻击伤害更高；行动后自动面向攻击目标。", 28, Color(0.9, 0.9, 0.95)],
 		["深水无法涉足，请走浅滩或木桥；夹住敌人可触发夹击追击。", 28, Color(0.9, 0.9, 0.95)],
-	], [["开始战斗", func():
+	]
+	if state.gdd_mode:
+		lines = [
+			[def["name"], 56, Color(1, 0.88, 0.6)],
+			["胜利条件：" + def["win_text"], 34, Color(0.75, 0.95, 0.75)],
+			["败北条件：" + def["lose_text"], 34, Color(1, 0.7, 0.65)],
+			["每轮按速度排序；每次行动6AP，移动与出招可自由穿插。", 28, UIKit.IVORY],
+			["八方向移动每格1AP，泥地2AP；不能穿过封闭墙角或占用格。", 28, UIKit.IVORY],
+			["侧面命中+5%，背后+10%；侧背只修正命中。", 28, UIKit.IVORY],
+			["敌方前侧5格为控制区；离区可能遭借机攻击，正侧受击可自动反击。", 28, UIKit.IVORY],
+			["自动反击与借机共用每轮1RP；紫色控制区，红色路径表示离区风险。", 28, UIKit.IVORY],
+			["内力上限12，自身行动开始恢复1；调息花3AP恢复4内力，每次行动限一次。", 28, UIKit.IVORY],
+		]
+	overlay = _overlay_panel(lines, [["开始战斗", func():
 		AudioManager.play_ui("ui_confirm")
 		_start_battle()
 	]])
@@ -721,11 +791,13 @@ func _overlay_panel(lines: Array, buttons: Array) -> Control:
 # ================================================================== player states
 
 func _menu_title(u: BattleUnit) -> String:
-	return ("%s  ·  AP %d/%d  内力 %d/%d" % [u.name, u.ap, u.max_ap, u.qi, u.max_qi]) if u.use_gdd_rules else ("%s  TP %d/%d" % [u.name, u.tp, u.max_tp])
+	return ("%s · AP%d/%d 内力%d/%d" % [u.name, u.ap, u.max_ap, u.qi, u.max_qi]) if u.use_gdd_rules else ("%s  TP %d/%d" % [u.name, u.tp, u.max_tp])
 
 
 func _enter_main() -> void:
 	mode = "main"
+	move_preview_cell = NONE
+	pending_move = NONE
 	sel_skill = ""
 	sel_target = NONE
 	sel_ground = false
@@ -744,9 +816,11 @@ func _enter_main() -> void:
 				_set_hl(p, COL_MOVE)
 	if u.use_gdd_rules or not state.acted:
 		_show_reach(u, stand)
+	if u.use_gdd_rules:
+		_show_control_zones(u)
 	_set_cursor(u.pos)
 	if u.use_gdd_rules:
-		_hint("剩余AP内可继续移动或出招；「待机」结束本次行动")
+		_hint("蓝格可移动 · 紫色为敌方控制区（暗色RP已用尽）· 红色路径提示借机风险")
 	elif not state.moved:
 		_hint("蓝色格可移动 · 红框为攻击范围 · 同格再点切换地面 / 单位")
 	elif not state.acted:
@@ -772,11 +846,53 @@ func _enter_main() -> void:
 	_show_info(u)
 
 
+func _show_control_zones(u: BattleUnit) -> void:
+	for enemy in state.living(1 - u.team):
+		for p in ControlZone.cells(enemy, state.map):
+			# Keep the stronger warning when multiple control zones overlap.
+			if enemy.rp > 0 or tiles[p].hl != COL_ZOC:
+				_set_hl(p, COL_ZOC if enemy.rp > 0 else COL_ZOC_SPENT)
+
+
+func _preview_move(cell: Vector2i) -> Array:
+	var u := state.current()
+	var path := Pathing.path_to(move_info, u.pos, cell)
+	return _show_path_preview(path, int(move_info["cost"].get(cell, 0)))
+
+
+func _show_path_preview(path: Array, ap_cost: int, immune := false, heading := "移动") -> Array:
+	_clear_hl2()
+	var risks := state.path_reactions(state.current(), path, immune)
+	for p in path:
+		_set_hl(p, COL_PATH, true)
+	var t := "%s · 消耗 AP%d 内力0\n移动后 AP %d/%d · 内力 %d/%d\n" % [heading, ap_cost, maxi(0, state.current().ap - ap_cost), state.current().max_ap, state.current().qi, state.current().max_qi]
+	for risk in risks:
+		_set_hl(risk["from"], COL_PATH_RISK, true)
+		_set_hl(risk["to"], COL_PATH_RISK, true)
+	t += _path_risk_text(risks, immune)
+	preview_text.text = t.strip_edges()
+	preview_panel.show()
+	return risks
+
+
+func _path_risk_text(risks: Array, immune: bool) -> String:
+	var t := ""
+	for risk in risks:
+		t += "[color=#ff7060]离开控制区：%s 借机攻击（RP %d/1）\n命中 %d%% · 命中后伤害 %d[/color]\n" % [risk["source"].name, risk["source"].rp, risk["hit"], risk["dmg"]]
+	if risks.is_empty():
+		t += "借机攻击：无" + ("（燕行步豁免）" if immune else "")
+	return t
+
+
 ## Red outlines: every tile the basic attack can reach from some reachable standing tile;
 ## enemies inside that reach get a red fill.
 func _show_reach(u: BattleUnit, stand: Array) -> void:
 	var reach := {}
 	for s in stand:
+		if u.use_gdd_rules:
+			var step_cost: int = move_info.get("cost", {}).get(s, 0)
+			if not state.skill_usable(u, u.basic) or step_cost + int(SkillDB.get_skill(u.basic).get("ap", 0)) > u.ap:
+				continue
 		for p in state.target_tiles(u, u.basic, s):
 			reach[p] = true
 	for p in reach:
@@ -834,9 +950,16 @@ func _on_skills() -> void:
 		var cost_txt := _skill_cost(sk)
 		items.append(["%s  ·  %s" % [sk["name"], cost_txt], _enter_target.bind(sid), ok])
 		var need := ("本行动已使用" if bool(sk.get("once", false)) and u.used_skills.get(sid, false) else "资源不足") if u.use_gdd_rules else "TP不足"
-		desc += "[color=#ffd27a]%s[/color] (%s)%s：%s\n" % [sk["name"], cost_txt, "" if ok else "[color=#ff8080]%s[/color]" % need, sk["desc"]]
+		if not u.use_gdd_rules:
+			desc += "[color=#ffd27a]%s[/color] (%s)%s：%s\n" % [sk["name"], cost_txt, "" if ok else "[color=#ff8080]%s[/color]" % need, sk["desc"]]
+	if u.use_gdd_rules:
+		desc += "选择招式查看合法范围、AP与内力消耗及风险预测。\n防御：格挡（2AP） · 调息：恢复4内力（3AP，每次行动限一次）"
 	items.append(["返回", _enter_main, true])
 	_set_menu(items, _menu_title(u))
+	if u.use_gdd_rules:
+		for i in u.skills.size():
+			var sk := SkillDB.get_skill(u.skills[i])
+			menu_box.get_child(i).tooltip_text = sk["desc"] + ("\n本行动已使用" if bool(sk.get("once", false)) and u.used_skills.get(u.skills[i], false) else ("\nAP或内力不足" if not state.skill_usable(u, u.skills[i]) else ""))
 	preview_text.text = desc.strip_edges()
 	preview_panel.visible = true
 	_hint("选择要使用的技能")
@@ -846,6 +969,7 @@ func _enter_target(sid: String) -> void:
 	var u := state.current()
 	var sk := SkillDB.get_skill(sid)
 	mode = "target"
+	move_preview_cell = NONE
 	sel_skill = sid
 	sel_target = NONE
 	sel_ground = false
@@ -867,6 +991,8 @@ func _enter_target(sid: String) -> void:
 			var o := state.unit_at(p)
 			if o != null and (o.team == u.team) == (sk["kind"] == "heal"):
 				_set_edge(p, Color(1, 1, 0.6, 0.95))
+		if u.use_gdd_rules and sk["shape"] == "leap":
+			_show_control_zones(u)
 		_hint("点击目标查看预测；同格再点确认；或按「确认」执行")
 		_set_menu([["确认", _confirm, false], ["取消", _enter_main, true]], sk["name"])
 	_set_cursor(u.pos)
@@ -899,8 +1025,16 @@ func _select_target(cell: Vector2i) -> void:
 
 func _show_preview(sk: Dictionary, entries: Array) -> void:
 	var t := "[b]%s[/b]  %s\n" % [sk["name"], _skill_cost(sk)]
+	if state.gdd_mode:
+		t += _resources_after(sk) + "\n"
 	if entries.is_empty():
 		t += sk["desc"] if sk["shape"] == "leap" else "范围内没有可作用的目标。"
+		if state.gdd_mode and sk["shape"] == "leap" and sel_target != NONE:
+			var u := state.current()
+			var path := Pathing.path_to(state.lightfoot_reach(u, sk, u.pos), u.pos, sel_target)
+			var immune := bool(sk.get("opportunity_immune", false))
+			var risks := _show_path_preview(path, int(sk.get("ap", 0)), immune)
+			t += "\n" + _path_risk_text(risks, immune)
 	for e in entries:
 		var tu: BattleUnit = e["unit"]
 		if e["heal"]:
@@ -908,8 +1042,25 @@ func _show_preview(sk: Dictionary, entries: Array) -> void:
 			t += "%s  恢复 [color=#80ff90]%d[/color]   HP %d→%d\n" % [tu.name, amount, tu.hp, tu.hp + amount]
 			continue
 		var after := maxi(0, tu.hp - int(e["dmg"]))
-		t += "%s  伤害 [color=#ffe070]%d[/color]  命中 [color=#90d0ff]%d%%[/color]   HP %d→%d%s\n" % [
-			tu.name, e["dmg"], e["hit"], tu.hp, after, "  [color=#ff7060]可击倒[/color]" if after == 0 else ""]
+		t += "%s  %s伤害 [color=#ffe070]%d[/color]  命中 [color=#90d0ff]%d%%[/color]   %s %d→%d%s\n" % [
+			tu.name, "预计命中后" if state.gdd_mode else "", e["dmg"], e["hit"], "气血" if state.gdd_mode else "HP", tu.hp, after, ("  [color=#ff7060]命中可击倒[/color]" if state.gdd_mode else "  [color=#ff7060]可击倒[/color]") if after == 0 else ""]
+		if state.gdd_mode:
+			var parts: Dictionary = e["hit_parts"]
+			t += "基础%d%%  眼力%+d  闪避%+d  侧背%+d  地形%+d（限10—95%%）\n" % [parts["base"], parts["accuracy"], parts["evasion"], parts["side"], parts["terrain"]]
+			var counter := state.counter_preview(state.current(), sel_skill, tu)
+			if counter.is_empty():
+				t += "自动反击：无（目标RP %d/1、位置或招式条件不符）\n" % tu.rp
+			else:
+				t += "[color=#ffb080]自动反击：可能（RP %d/1，%s）\n反击命中 %d%% · 命中后伤害 %d[/color]\n" % [tu.rp, counter["condition"], counter["hit"], counter["dmg"]]
+			if sk.get("effect") == "retreat":
+				var u := state.current()
+				var path := state.retreat_path(u, tu.pos)
+				var risks := state.path_reactions(u, path, bool(sk.get("retreat_safe", false)), Combat.dir_toward(u.pos, tu.pos, u.facing))
+				if not path.is_empty():
+					t += "自主后撤（反应者仍存活时）：\n" + _path_risk_text(risks, bool(sk.get("retreat_safe", false))) + "\n"
+				for risk in risks:
+					_set_hl(risk["from"], COL_PATH_RISK, true)
+					_set_hl(risk["to"], COL_PATH_RISK, true)
 		var tags: Array = e["labels"]
 		if not tags.is_empty():
 			var parts := []
@@ -985,6 +1136,8 @@ func _end_turn() -> void:
 func _cancel() -> void:
 	AudioManager.play_ui("ui_cancel")
 	match mode:
+		"move_confirm":
+			_enter_main()
 		"target", "skills":
 			_enter_main()
 		"main":
@@ -1472,6 +1625,8 @@ func _desktop_key(event: InputEventKey) -> bool:
 		KEY_SPACE, KEY_ENTER, KEY_KP_ENTER:
 			if mode == "target":
 				_confirm()
+			elif mode == "move_confirm":
+				_confirm_move()
 			elif mode == "main":
 				_end_turn()
 		KEY_Z, KEY_BACKSPACE:
@@ -1515,12 +1670,36 @@ func _update_hover() -> void:
 		return
 	hover_cursor.show_at(view.screen(cell, state.map.get_h(cell)), view.cursor_z(cell) + 1)
 	var unit := state.unit_at(cell)
+	if state.gdd_mode and mode == "main":
+		var moving: bool = not move_info.is_empty() and move_info["ends"].has(cell) and cell != state.current().pos
+		if moving and move_preview_cell != cell:
+			move_preview_cell = cell
+			_preview_move(cell)
+		elif not moving and move_preview_cell != NONE:
+			move_preview_cell = NONE
+			_clear_hl2()
+			_clear_preview()
 	var ground := "%s · 高度%d · 回避%+d" % [Terrain.info(state.map.get_terrain(cell))["name"], state.map.get_h(cell), state.map.evasion(cell)]
-	hover_label.text = "%s · %s · %s\n生命 %d/%d · 技力%d/%d\n%s" % [unit.name, unit.class_label(), "我方" if unit.team == BattleUnit.PLAYER else "敌方", unit.hp, unit.max_hp, unit.tp, unit.max_tp, ground] if unit != null else ground
+	if state.gdd_mode:
+		ground = _terrain_text(cell).replace("[color=#ff9a80]", "").replace("[/color]", "")
+	hover_label.text = _hover_unit_text(unit, ground) if unit != null else ground
 	hover_panel.reset_size()
 	var extent := get_viewport().get_visible_rect().size
 	hover_panel.position = (pos + Vector2(22, 22)).clamp(Vector2(24, 24), (extent - hover_panel.size - Vector2(24, 24)).max(Vector2(24, 24)))
 	hover_panel.show()
+
+
+func _hover_unit_text(unit: BattleUnit, ground: String) -> String:
+	if unit.use_gdd_rules:
+		var statuses := []
+		if unit.guard:
+			statuses.append("护势")
+		if unit.block:
+			statuses.append("格挡")
+		if unit.ap_penalty > 0 or unit.qi_blocked:
+			statuses.append("气脉受阻")
+		return "%s · %s\n气血 %d/%d · AP %d/%d %s\n内力 %d/%d · RP 反应 %d/1\n劲力%d 护体%d 眼力%+d 身法%d 速度%d\n%s\n%s" % [unit.name, "我方" if unit.team == BattleUnit.PLAYER else "敌方", unit.hp, unit.max_hp, unit.ap, unit.max_ap, _ap_cells(unit), unit.qi, unit.max_qi, unit.rp, unit.atk, unit.def, unit.acc, unit.eva, unit.spd, " · ".join(statuses), ground]
+	return "%s · %s · %s\n生命 %d/%d · 技力%d/%d\n%s" % [unit.name, unit.class_label(), "我方" if unit.team == BattleUnit.PLAYER else "敌方", unit.hp, unit.max_hp, unit.tp, unit.max_tp, ground]
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1657,7 +1836,7 @@ func _on_tap(pos: Vector2) -> void:
 		"main":
 			var u := state.current()
 			if state.can_move(u) and not move_info.is_empty() and (move_info["ends"] as Array).has(cell) and cell != u.pos:
-				_do_move(cell)
+				_request_move(cell)
 				return
 			if other != null and other.team != u.team and (u.use_gdd_rules or not state.acted) and not sel_ground:
 				var basic_targets := state.target_tiles(u, u.basic, u.pos)
@@ -1666,6 +1845,9 @@ func _on_tap(pos: Vector2) -> void:
 					_select_target(cell)
 					return
 			_inspect(cell, other)
+		"move_confirm":
+			if cell == pending_move:
+				_confirm_move()
 		"target":
 			if target_set.has(cell):
 				_select_target(cell)
@@ -1683,6 +1865,9 @@ func _on_tap(pos: Vector2) -> void:
 
 func _inspect(cell: Vector2i, other: BattleUnit) -> void:
 	_clear_hl2()
+	if state.gdd_mode and mode == "main":
+		move_preview_cell = NONE
+		_clear_preview()
 	if cell == focus_cell and other != null:
 		sel_ground = not sel_ground
 	else:
@@ -1705,13 +1890,40 @@ func _inspect(cell: Vector2i, other: BattleUnit) -> void:
 func _do_move(cell: Vector2i) -> void:
 	mode = "busy"
 	_set_menu([])
+	_clear_preview()
 	_clear_hl()
 	_hint("")
 	var u := state.current()
 	var path := state.move_unit(u, cell)
 	await _animate_path(u, path)
 	_refresh_all()
+	if u.use_gdd_rules:
+		var result := state.outcome()
+		if result != "":
+			_finish(result)
+			return
+		if not u.alive():
+			_end_turn()
+			return
 	_enter_main()
+
+
+func _request_move(cell: Vector2i) -> void:
+	if state.gdd_mode:
+		var risks := _preview_move(cell)
+		if not risks.is_empty():
+			mode = "move_confirm"
+			pending_move = cell
+			_set_cursor(cell)
+			_hint("红色路径将离开敌方控制区，可能遭借机攻击；再次点击落点或确认")
+			_set_menu([["确认危险移动", _confirm_move, true], ["取消", _enter_main, true]], _menu_title(state.current()))
+			return
+	_do_move(cell)
+
+
+func _confirm_move() -> void:
+	if mode == "move_confirm" and pending_move != NONE:
+		_do_move(pending_move)
 
 
 # ================================================================== screenshot setup

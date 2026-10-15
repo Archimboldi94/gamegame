@@ -38,6 +38,7 @@ func _run_all() -> void:
 		"test_wuxia_lightfoot_opportunities", "test_wuxia_retreat_once_and_reactions",
 		"test_wuxia_movement_cost_and_action_combos", "test_wuxia_ai_resource_and_active_skills",
 		"test_wuxia_hud_skill_availability",
+		"test_wuxia_hud_resources_intro_and_rounds", "test_wuxia_hud_forecast_and_control_zones",
 		"test_chapter_event_conditions_and_rewards", "test_chapter_stance_once_and_failure",
 		"test_chapter_save_round_trip", "test_exploration_movement_and_radius",
 		"test_exploration_outdoor_reachability", "test_exploration_scene_interactions",
@@ -1468,6 +1469,15 @@ func test_wuxia_b1_setup() -> void:
 	for u in s.units:
 		names.append(u.name)
 	check(names.has("剑客") and names.has("劫客甲"), "named cast loaded")
+	s.living(BattleUnit.PLAYER)[0].hp = 0
+	eq(s.outcome(), "", "B1 continues when swordsman falls but allies survive")
+	for u in s.living(BattleUnit.PLAYER):
+		u.hp = 0
+	eq(s.outcome(), "lose", "B1 all-party defeat matches objective text")
+	s = BattleDefs.build_wuxia_b1(7)
+	for u in s.living(BattleUnit.ENEMY):
+		u.hp = 0
+	eq(s.outcome(), "win", "B1 victory requires all bandits defeated")
 
 
 # GDD 4.4–4.7 / 6.4: deterministic B1 martial-art acceptance tests.
@@ -1947,6 +1957,205 @@ func test_wuxia_ai_resource_and_active_skills() -> void:
 	d.hp = 0
 	plan = EnemyAI.plan(s, a)
 	eq(plan["skill"], "普攻", "AI can attack diagonal neighbor without movement")
+
+
+func hud_text(node: Node) -> String:
+	var result := ""
+	if node is Label or node is Button:
+		result += node.text + "\n"
+	elif node is RichTextLabel:
+		result += node.get_parsed_text() + "\n"
+	for child in node.get_children():
+		result += hud_text(child)
+	return result
+
+
+func check_hud_bounds(battle: Node) -> void:
+	var extent := root.get_visible_rect().end
+	for control in [battle.info_text, battle.menu_panel, battle.preview_panel]:
+		if control.is_visible_in_tree():
+			check(control.get_global_rect().end.y <= extent.y, "GDD HUD stays inside viewport vertically")
+			check(control.get_global_rect().end.x <= extent.x, "GDD HUD stays inside viewport horizontally")
+
+
+func test_wuxia_hud_resources_intro_and_rounds() -> void:
+	var game = root.get_node("Game")
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	game.shot = "wuxia"
+	game.current_battle = "wuxia_b1"
+	var battle = load("res://scripts/game/battle.gd").new()
+	root.add_child(battle)
+	var u: BattleUnit = battle.state.current()
+	eq(battle.mode, "main", "wuxia screenshot skips intro and opens action menu")
+	eq(u, battle.state.living(BattleUnit.PLAYER)[0], "wuxia screenshot selects first ally")
+	check(battle.overlay == null, "screenshot has no intro blocking the battlefield")
+	u.ap = 4
+	u.qi = 7
+	u.rp = 0
+	u.gain_guard()
+	battle._enter_main()
+	var text: String = hud_text(battle.ui_root)
+	check(text.contains("AP") and text.contains("内力 7/12"), "live HUD uses AP and qi")
+	check(not text.contains("技力") and not text.contains("TP"), "GDD visible HUD has no classic resources")
+	check(battle.info_text.get_parsed_text().contains("■■■■□□ 4/6"), "AP cells show both spent and available AP")
+	check(battle.info_text.text.contains("反应 0/1"), "RP denominator shows per-round reaction budget")
+	for attribute in ["气血", "劲力", "护体", "眼力", "身法", "速度", "内力"]:
+		check(battle.info_text.text.contains(attribute), "unit info shows existing attribute " + attribute)
+	check(battle.info_text.text.contains("护势"), "guard stance visible")
+	u.gain_block()
+	u.qi_blocked = true
+	battle._show_info(u)
+	check(battle.info_text.text.contains("格挡") and battle.info_text.text.contains("气脉受阻"), "block and active qi seal visible")
+	var hover: String = battle._hover_unit_text(u, "地形")
+	check(hover.contains("AP 4/6") and hover.contains("内力 7/12") and hover.contains("反应 0/1"), "hover uses real GDD resources")
+	check(hover.contains("格挡") and hover.contains("气脉受阻") and not hover.contains("技力"), "hover explains current statuses")
+	battle._enter_main()
+	await process_frame
+	await process_frame
+	check_hud_bounds(battle)
+	battle._on_skills()
+	await process_frame
+	await process_frame
+	check_hud_bounds(battle)
+	battle._enter_target("调息")
+	check(battle.preview_text.text.contains("AP3 内力0") and battle.preview_text.text.contains("内力 11/12"), "rest preview shows cost and capped qi gain")
+	battle._show_intro()
+	text = hud_text(battle.overlay)
+	for phrase in ["6AP", "穿插", "八方向", "1AP", "泥地2AP", "侧背只修正命中", "控制区", "借机", "自动反击", "1RP", "调息", "击败全部劫客", "我方全灭"]:
+		check(text.contains(phrase), "intro teaches GDD rule " + phrase)
+	for phrase in ["技力", "TP", "伤害更高", "夹击追击", "林砚"]:
+		check(not text.contains(phrase), "intro excludes classic wording " + phrase)
+	battle.overlay.free()
+	battle.overlay = null
+	for i in range(battle.state.units.size()):
+		battle._refresh_timeline()
+		check(battle.turn_label.text.begins_with("第1轮 · 当前行动者："), "round label stays at one across all actors")
+		battle.state.end_turn()
+		battle.state.begin_next_turn()
+	battle._refresh_timeline()
+	check(battle.turn_label.text.begins_with("第2轮 · 当前行动者："), "round label advances after all actors finish")
+	check(not battle.turn_label.text.contains("手"), "GDD timeline never calls actions hands")
+	battle.free()
+	game.shot = old_shot
+	game.current_battle = old_battle
+
+
+func test_wuxia_hud_forecast_and_control_zones() -> void:
+	var game = root.get_node("Game")
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	game.shot = "wuxia"
+	game.current_battle = "wuxia_b1"
+	var battle = load("res://scripts/game/battle.gd").new()
+	root.add_child(battle)
+	var u: BattleUnit = battle.state.current()
+	var enemy: BattleUnit = battle.state.living(BattleUnit.ENEMY)[0]
+	for other in battle.state.units:
+		if other != u and other != enemy:
+			other.hp = 0
+	u.pos = Vector2i(6, 8)
+	u.facing = 0
+	enemy.pos = Vector2i(6, 9)
+	for facing in range(8):
+		enemy.facing = facing
+		battle._enter_main()
+		var count := 0
+		for p in battle.tiles:
+			if battle.tiles[p].hl == battle.COL_ZOC:
+				count += 1
+				check(ControlZone.cells(enemy, battle.state.map).has(p), "highlight matches actual control geometry")
+		eq(count, 5, "five control-zone tiles highlighted for facing " + str(facing))
+	enemy.facing = 0
+	var goal := Vector2i(6, 7)
+	battle._enter_main()
+	var before := [u.pos, u.ap, u.qi, enemy.rp, battle.state.rng.state]
+	var risks: Array = battle._preview_move(goal)
+	eq(risks.size(), 1, "leaving control zone previews one reaction")
+	eq(battle.tiles[u.pos].hl2, battle.COL_PATH_RISK, "departure tile marked red")
+	eq(battle.tiles[goal].hl2, battle.COL_PATH_RISK, "dangerous step endpoint marked red")
+	check(battle.preview_text.text.contains("AP1 内力0") and battle.preview_text.text.contains("借机攻击"), "movement forecast shows both resource costs and danger")
+	var hit: Dictionary = Combat.gdd_calc(enemy, u, SkillDB.get_skill(enemy.basic), battle.state.map, enemy.pos, true)
+	check(battle.preview_text.text.contains("命中 %d%%" % hit["hit"]), "opportunity hit chance uses reaction penalty")
+	battle._request_move(goal)
+	eq(battle.mode, "move_confirm", "dangerous movement requires confirmation")
+	eq([u.pos, u.ap, u.qi, enemy.rp, battle.state.rng.state], before, "path previews and confirmation do not mutate battle or RNG")
+	battle._cancel()
+	eq(battle.mode, "main", "cancel danger returns to main menu")
+	eq([u.pos, u.ap, u.qi, enemy.rp, battle.state.rng.state], before, "cancelling danger spends no resources")
+	var loop_path := [u.pos, goal, u.pos, goal]
+	eq(battle.state.path_reactions(u, loop_path).size(), 1, "same enemy cannot react twice along one path")
+	eq(battle.state.path_reactions(u, [u.pos, Vector2i(5, 8)]).size(), 0, "movement within same control zone is safe")
+	eq(battle.state.path_reactions(u, [goal, u.pos]).size(), 0, "entering a control zone is safe")
+	enemy.rp = 0
+	battle._enter_main()
+	var dark_count := 0
+	for p in battle.tiles:
+		if battle.tiles[p].hl == battle.COL_ZOC_SPENT:
+			dark_count += 1
+	eq(dark_count, 5, "spent-RP geometry has five dim control tiles")
+	eq(battle._preview_move(goal).size(), 0, "spent RP causes no opportunity warning")
+	enemy.rp = 1
+	battle._enter_target("燕行步")
+	battle._select_target(goal)
+	check(battle.preview_text.text.contains("AP2 内力4") and battle.preview_text.text.contains("内力 8/12"), "lightfoot forecast shows fixed costs and resources after use")
+	check(battle.preview_text.text.contains("借机攻击：无（燕行步豁免）"), "safe lightfoot does not warn about opportunity attacks")
+	u.lightfoot = "踏雪步"
+	u.skills.append("踏雪步")
+	battle._enter_target("踏雪步")
+	battle._select_target(goal)
+	check(battle.preview_text.text.contains("离开控制区") and battle.tiles[goal].hl2 == battle.COL_PATH_RISK, "taxue previews real opportunity risk")
+	battle._enter_target(u.basic)
+	battle._select_target(enemy.pos)
+	var attack: Dictionary = battle.state.preview(u, u.basic, enemy.pos)[0]
+	var text: String = battle.preview_text.get_parsed_text()
+	check(text.contains("预计命中后伤害 %d" % attack["dmg"]) and text.contains("命中 %d%%" % attack["hit"]), "attack forecast matches rule damage and chance")
+	for part in ["基础90%", "眼力+5", "闪避-10", "侧背+0", "地形+0"]:
+		check(text.contains(part), "hit breakdown includes " + part)
+	check(text.contains("AP3 内力0") and text.contains("施展后 AP 3/6"), "attack forecasts spending and remaining resources")
+	check(text.contains("自动反击：可能") and text.contains("反击命中"), "front attack warns about automatic counter")
+	enemy.rp = 0
+	battle._show_preview(SkillDB.get_skill(u.basic), battle.state.preview(u, u.basic, enemy.pos))
+	check(battle.preview_text.text.contains("自动反击：无（目标RP 0/1"), "counter forecast respects spent RP")
+	enemy.rp = 1
+	u.pos = Vector2i(6, 10)
+	battle._enter_target(u.basic)
+	battle._select_target(enemy.pos)
+	check(battle.preview_text.text.contains("侧背+10") and battle.preview_text.text.contains("自动反击：无"), "back attack shows hit-only bonus and no counter")
+	u.pos = Vector2i(7, 9)
+	battle._enter_target(u.basic)
+	battle._select_target(enemy.pos)
+	check(battle.preview_text.text.contains("侧背+5") and battle.preview_text.text.contains("自动反击：可能"), "side attack includes hit bonus and counter risk")
+	u.pos = Vector2i(6, 8)
+	var push: Dictionary = battle.state.counter_preview(u, "震山掌", enemy)
+	check(push.get("condition", "").contains("落空后"), "knockback forecast only warns of counter on a miss")
+	check(battle.state.counter_preview(u, "破风剑", enemy).is_empty(), "area attacks do not forecast automatic counters")
+	battle._enter_target("回锋剑")
+	battle._select_target(enemy.pos)
+	check(battle.preview_text.text.contains("自主后撤") and battle.preview_text.text.contains("离开控制区"), "free retreat forecasts opportunity attacks separately from counters")
+	check(battle.preview_text.text.contains("自动反击：无"), "enemy cannot counter after spending its RP on retreat")
+	await process_frame
+	await process_frame
+	check_hud_bounds(battle)
+	u.ap = 2
+	battle._enter_main()
+	var attack_edges := 0
+	for p in battle.tiles:
+		if battle.tiles[p].edge.a > 0:
+			attack_edges += 1
+	eq(attack_edges, 0, "main attack reach excludes attacks with insufficient AP")
+	u.ap = 6
+	# Terrain and accuracy terms sum to the same clamped chance used in resolution.
+	battle.state.map.set_terrain(enemy.pos, "forest")
+	attack = Combat.calc(u, enemy, SkillDB.get_skill(u.basic), battle.state.map, u.pos)
+	var sum := 0
+	for value in attack["hit_parts"].values():
+		sum += int(value)
+	eq(clampi(sum, 10, 95), attack["hit"], "displayed hit components reproduce actual hit chance")
+	check(attack["hit_parts"]["terrain"] < 0, "cover appears as negative terrain hit modifier")
+	battle.free()
+	game.shot = old_shot
+	game.current_battle = old_battle
 
 
 func test_wuxia_hud_skill_availability() -> void:

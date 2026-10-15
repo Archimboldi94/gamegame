@@ -192,7 +192,8 @@ static func build_wuxia_b1(seed := 7) -> BattleState:
 		var spots: Array = markers[marker_key]
 		u.pos = Vector2i(int(spots[0][0]), int(spots[0][1]))
 		u.facing = _vec_facing(definition["facing"])
-		u.is_lord = u.team == BattleUnit.PLAYER and u.id == 0
+		# B1 is lost only when the whole party falls (GDD 25.1).
+		u.is_lord = false
 		u.title = "青崖渡同行" if u.team == BattleUnit.PLAYER else "渡口劫匪"
 		u.ai = "aggressive"
 		u.cls = "lancer" if u.weapon == "spear" else "swordsman"

@@ -77,14 +77,14 @@ func show_unit(u: BattleUnit, map: BattleMap, after := -1) -> void:
 	unit_name.text = u.name
 	unit_name.add_theme_color_override("font_color", UIKit.ALLY if u.team == BattleUnit.PLAYER else UIKit.FOE)
 	role.text = "%s · %s" % [team, u.class_label()]
-	hp_text.text = "生命 %d/%d" % [u.hp, u.max_hp]
+	hp_text.text = "%s %d/%d" % ["气血" if u.use_gdd_rules else "生命", u.hp, u.max_hp]
 	if after >= 0:
 		hp_text.text += " →%d" % after
 	hp_bar.max_value = u.max_hp
 	hp_bar.value = u.hp
 	hp_bar.show()
 	if u.use_gdd_rules:
-		tp_text.text = "AP %d/%d · 内力 %d/%d · RP %d" % [u.ap, u.max_ap, u.qi, u.max_qi, u.rp]
+		tp_text.text = "AP %d/%d %s\n内力 %d/%d · RP 反应 %d/1" % [u.ap, u.max_ap, "■".repeat(u.ap) + "□".repeat(u.max_ap - u.ap), u.qi, u.max_qi, u.rp]
 		tp_bar.max_value = u.max_ap
 		tp_bar.value = u.ap
 	else:
@@ -97,7 +97,9 @@ func show_unit(u: BattleUnit, map: BattleMap, after := -1) -> void:
 	tooltip_text = "%s\n移动%d · 跳跃%d · 朝向%s%s" % [u.title, u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing], " · 守势" if u.guard else ""]
 	var terrain := Terrain.info(map.get_terrain(u.pos))
 	if u.use_gdd_rules:
-		terrain_text.text = "%s · AP%d 内力%d · 朝%s%s" % [terrain["name"], u.ap, u.qi, BattleUnit.DIR_NAMES[u.facing], " · 护势" if u.guard else (" · 格挡" if u.block else "")]
+		details.text = "劲力%d 护体%d 眼力%+d 身法%d 速度%d" % [u.atk, u.def, u.acc, u.eva, u.spd]
+		terrain_text.text = "%s · 朝%s%s%s" % [terrain["name"], BattleUnit.DIR_NAMES[u.facing], " · 护势" if u.guard else (" · 格挡" if u.block else ""), " · 气脉受阻" if u.ap_penalty > 0 or u.qi_blocked else ""]
+		tooltip_text = "%s\nRP每轮刷新 · 速度仅影响行动排序" % u.title
 	else:
 		terrain_text.text = "%s · 高%d · 移%d 跳%d · 朝%s%s" % [terrain["name"], map.get_h(u.pos), u.mov, u.jump, BattleUnit.DIR_NAMES[u.facing], " · 守势" if u.guard else ""]
 	terrain_text.tooltip_text = "地形回避 %+d · 移动消耗 %d" % [map.evasion(u.pos), map.move_cost(u.pos)]

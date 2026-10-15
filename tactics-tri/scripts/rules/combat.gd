@@ -178,7 +178,9 @@ static func calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: Battl
 static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: BattleMap, from: Vector2i, reaction := false) -> Dictionary:
 	var side := relative_side(tgt.pos, tgt.facing, from)
 	var side_hit := 10 if side == "back" else (5 if side == "side" else 0)
-	var hit := int(skill.get("base_hit", 90)) + att.acc - tgt.eva - map.evasion(tgt.pos) + side_hit
+	var hit_parts := {"base": int(skill.get("base_hit", 90)), "accuracy": att.acc, "evasion": -tgt.eva,
+		"side": side_hit, "terrain": -map.evasion(tgt.pos), "reaction": -10 if reaction else 0}
+	var hit := int(hit_parts["base"]) + att.acc - tgt.eva - map.evasion(tgt.pos) + side_hit
 	if reaction:
 		hit -= 10
 	var armor := maxi(0, tgt.def + (2 if tgt.block else 0) - int(skill.get("pierce", 0)))
@@ -193,4 +195,4 @@ static func gdd_calc(att: BattleUnit, tgt: BattleUnit, skill: Dictionary, map: B
 		labels.append("护势 -25%（一击）")
 	if tgt.block:
 		labels.append("格挡 护甲+2（一击）")
-	return {"dmg": damage, "hit": clampi(hit, 10, 95), "side": side, "labels": labels, "heal": false, "mult": 0.75 if tgt.guard else 1.0}
+	return {"dmg": damage, "hit": clampi(hit, 10, 95), "hit_parts": hit_parts, "side": side, "labels": labels, "heal": false, "mult": 0.75 if tgt.guard else 1.0}
