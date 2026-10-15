@@ -160,7 +160,7 @@ func _build_theme() -> Theme:
 	t.set_color("font_hover_pressed_color", "Button", Color(1.0, 0.86, 0.5))
 	t.set_color("font_focus_color", "Button", Color(1.0, 0.96, 0.86))
 	t.set_color("font_disabled_color", "Button", Color(0.62, 0.62, 0.64))
-	var panel := _sbt("res://assets/ui/panel.png", 24.0, 22.0)
+	var panel := _sbt("res://assets/ui/panel.png", 14.0, 22.0)
 	t.set_stylebox("panel", "PanelContainer", panel)
 	t.set_stylebox("panel", "Panel", panel)
 	t.set_font_size("font_size", "Label", 30)
@@ -173,7 +173,7 @@ func _build_theme() -> Theme:
 	return t
 
 
-func _sbt(path: String, margin := 24.0, content := 20.0) -> StyleBox:
+func _sbt(path: String, margin := 16.0, content := 20.0) -> StyleBox:
 	var tex = load(path)
 	if not (tex is Texture2D):
 		var flat := StyleBoxFlat.new()
@@ -218,7 +218,7 @@ func _do_shot() -> void:
 			_change("vote")
 		"battle", "battlemain", "battlefx", "wuxia", "wuxia_b1":
 			step = 2
-			current_battle = "wuxia_b1"
+			current_battle = "wuxia_b1" if shot in ["wuxia", "wuxia_b1"] else "b1"
 			_change("battle")
 		"battle2a", "battle2b":
 			step = 6

@@ -2,6 +2,7 @@
 
 - 日期：2026-10-15
 - 基线工程：`tactics-tri`（Claude 等距 UI / 美术管线）
+- **HUD 基线：Claude `f77192b`，不是 `d54bd9b` 双头像 HUD。** 顶部回合与时间轴、左侧纵向工具、右侧行动菜单、左下单位/地形信息与右下富文本预测；保留 GDD 的 AP / 内力 / 八向 / ZoC / 反击接线。
 - 规则权威：`wuxia-tactics/02_当前设计文档/武侠战棋_GDD_v2.0.md`（【已定】必须实现；【建议】可调）
 - 参考实现（仅规则/数据，不整体搬 UI）：`wuxia-tactics/01_Godot工程/WuxiaTactics_Core_v2.0/`
 - 旧 README / 天平之誓剧情：可忽略；投票抉择、多战程故事可后置
@@ -12,7 +13,7 @@
 |------|------|------|
 | 等距渲染 | `scripts/game/iso_view.gd`, `tile_node.gd`, `unit_node.gd` | 斜 45° 观感已达标，GDD 亦要求斜视 |
 | 战斗场景编排 | `scripts/game/battle.gd` | HUD、输入、动画编排完整 |
-| HUD / UI | `battle_unit_panel.gd`, `ui_kit.gd`, `tile_cursor.gd` | 情境型面板基础好，可按 v1.9 HUD 规范微调 |
+| HUD / UI | `battle.gd`, `ui_kit.gd`, `tile_cursor.gd` | 按 Claude `f77192b` 布局与面板样式维护，不使用双头像 HUD |
 | 特效 / 音效 | `battle_fx.gd`, `audio/` | 占位可用，后续换武学特效 |
 | 美术管线 | `art/`, `assets/`, 林砚武侠试制 | 精致像素方向一致 |
 | 无场景规则层 | `scripts/rules/*` | 已与表现分离，适合改规则而不推倒 UI |
@@ -78,7 +79,7 @@
 - 八向 + AP 穿插会破坏现有「先移动再攻击一次」的 UI 状态机，需在 `battle.gd` 把 `moved/acted` 改为「AP 余额驱动」。
 - 等距渲染假设四向邻接时，斜向高亮/路径折线要验证。
 - 勿从 Core 复制 `BattleUI.gd` 覆盖现有 HUD。
-- 旧关卡 `b1/b2A/b2B` 可保留为回归测试地图，主入口改武侠 B1。
+- 「开始游戏」保留原剧情流程，首战为 `b1` 青石渡石桥；「渡口截箱」单独进入 `wuxia_b1`。截图 `battle/battlemain/battlefx` 对应 `b1`，`wuxia/wuxia_b1` 对应武侠 B1。
 
 ## 6. 成功标准（Phase A）
 
