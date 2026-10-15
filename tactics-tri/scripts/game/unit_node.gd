@@ -1,12 +1,11 @@
 extends Node2D
-## Visual for one BattleUnit: team ring, facing arrow, miniature figure, HP bar, active marker,
+## Visual for one BattleUnit: team ring, facing arrow, chibi sprite, HP bar, active marker,
 ## plus the procedural hit reactions (flash shader, shake, HP drain, death fade).
 
-const SPRITE_RECT := Rect2(-43, -156, 86, 169)  # sprite, HP bar and active marker
+const SPRITE_RECT := Rect2(-50, -136, 100, 150)
 const SEE_THROUGH_ALPHA := 0.32
-const SPRITE_SCALE := 0.82
-const SPRITE_POS := Vector2(-39.36, -101)
-const BODY := Vector2(0, -49)
+const SPRITE_POS := Vector2(-48, -116)
+const BODY := Vector2(0, -58)
 const FLASH_SHADER := """
 shader_type canvas_item;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
@@ -50,7 +49,6 @@ func setup(u: BattleUnit, v: IsoView) -> void:
 	sprite.texture = load("res://assets/units/%s_%s.png" % [u.cls, team])
 	sprite.centered = false
 	sprite.position = SPRITE_POS
-	sprite.scale = Vector2.ONE * SPRITE_SCALE
 	sprite.material = mat
 	add_child(sprite)
 	refresh()
@@ -180,7 +178,7 @@ func die() -> Tween:
 	tw.set_parallel(true)
 	tw.tween_property(self, "modulate:a", 0.0, 0.45).set_delay(0.08)
 	tw.tween_property(sprite, "position", SPRITE_POS + Vector2(0, 18), 0.45).set_ease(Tween.EASE_IN)
-	tw.tween_property(sprite, "scale", Vector2(1.08, 0.82) * SPRITE_SCALE, 0.45)
+	tw.tween_property(sprite, "scale", Vector2(1.08, 0.82), 0.45)
 	tw.chain().tween_callback(func():
 		visible = false
 		modulate.a = 1.0
@@ -188,7 +186,7 @@ func die() -> Tween:
 		sprite.modulate.a = 1.0
 		self_modulate.a = 1.0
 		sprite.position = SPRITE_POS
-		sprite.scale = Vector2.ONE * SPRITE_SCALE
+		sprite.scale = Vector2.ONE
 		mat.set_shader_parameter("flash", 0.0))
 	return tw
 
@@ -202,11 +200,11 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var col := Color(0.52, 0.77, 0.83) if unit.team == BattleUnit.PLAYER else Color(0.86, 0.47, 0.35)
+	var col := Color(0.35, 0.65, 1.0) if unit.team == BattleUnit.PLAYER else Color(1.0, 0.35, 0.3)
 	var ring := PackedVector2Array()
 	for i in 25:
 		var a := TAU * i / 24.0
-		ring.append(Vector2(cos(a) * 29.0, sin(a) * 14.5))
+		ring.append(Vector2(cos(a) * 38.0, sin(a) * 19.0))
 	draw_colored_polygon(ring, Color(0, 0, 0, 0.35))
 	if active:
 		var pulse := 0.5 + 0.5 * sin(t * 4.0)
@@ -214,35 +212,33 @@ func _draw() -> void:
 		for p in ring:
 			outer.append(p * (1.12 + 0.06 * pulse))
 		draw_polyline(outer, Color(1, 0.9, 0.4, 0.5 + 0.4 * pulse), 3.0)
-	draw_polyline(ring, col, 2.5 if active else 1.5, true)
+	draw_polyline(ring, col, 4.0 if active else 3.0)
 	var v: Vector2 = view.screen_dir(unit.facing)
 	var perp := Vector2(-v.y, v.x)
-	var tip := Vector2(v.x * 42.0, v.y * 42.0)
-	var base := Vector2(v.x * 32.0, v.y * 32.0)
-	draw_colored_polygon(PackedVector2Array([tip, base + perp * 4.0, base - perp * 4.0]), col.lightened(0.2))
-	draw_polyline(PackedVector2Array([tip, base + perp * 4.0, base - perp * 4.0, tip]), UIKit.GOLD, 1.0)
+	var tip := Vector2(v.x * 62.0, v.y * 62.0)
+	var base := Vector2(v.x * 40.0, v.y * 40.0)
+	draw_colored_polygon(PackedVector2Array([tip, base + perp * 13.0, base - perp * 13.0]), col.lightened(0.2))
+	draw_polyline(PackedVector2Array([tip, base + perp * 13.0, base - perp * 13.0, tip]), Color(0, 0, 0, 0.6), 2.0)
 	var ratio := clampf(display_hp / float(unit.max_hp), 0.0, 1.0)
 	var trail := clampf(trail_hp / float(unit.max_hp), 0.0, 1.0)
-	draw_rect(Rect2(-30, -113, 60, 9), Color(0, 0, 0, 0.8))
+	draw_rect(Rect2(-40, -134, 80, 14), Color(0, 0, 0, 0.8))
 	if trail > ratio:
-		draw_rect(Rect2(-28, -111, 56.0 * trail, 5), Color(1.0, 0.95, 0.85))
-	var hp_col := Color(0.57, 0.76, 0.42) if ratio > 0.5 else (Color(1.0, 0.8, 0.25) if ratio > 0.25 else Color(1.0, 0.3, 0.25))
-	draw_rect(Rect2(-28, -111, 56.0 * ratio, 5), hp_col)
+		draw_rect(Rect2(-38, -132, 76.0 * trail, 10), Color(1.0, 0.95, 0.85))
+	var hp_col := Color(0.35, 0.9, 0.4) if ratio > 0.5 else (Color(1.0, 0.8, 0.25) if ratio > 0.25 else Color(1.0, 0.3, 0.25))
+	draw_rect(Rect2(-38, -132, 76.0 * ratio, 10), hp_col)
 	for i in unit.max_tp:
 		var c := Color(0.55, 0.85, 1.0) if i < unit.tp else Color(0.2, 0.22, 0.3)
-		draw_rect(Rect2(-28 + i * 12, -122, 9, 4), c)
+		draw_rect(Rect2(-38 + i * 16, -145, 13, 8), c)
 	if unit.is_leader:
-		_star(Vector2(37, -109), 8.0, Color(1.0, 0.82, 0.3))
+		_star(Vector2(50, -130), 12.0, Color(1.0, 0.82, 0.3))
 	if unit.is_lord:
-		_star(Vector2(37, -109), 8.0, Color(0.6, 0.85, 1.0))
+		_star(Vector2(50, -130), 12.0, Color(0.6, 0.85, 1.0))
 	if unit.guard:
-		_shield_badge(Vector2(-38, -110))
+		_shield_badge(Vector2(-52, -128))
 	if active:
-		var y := -153.0 + sin(t * 5.0) * 3.0
-		draw_style_box(UIKit.color_box(Color(0.16, 0.18, 0.13, 0.94), 3, UIKit.GOLD, 1), Rect2(-28, y - 22, 56, 23))
-		draw_string(Game.theme.default_font, Vector2(-18, y - 5), "行动", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UIKit.IVORY)
-		draw_colored_polygon(PackedVector2Array([Vector2(-9, y), Vector2(9, y), Vector2(0, y + 10)]), Color(1, 0.9, 0.4))
-		draw_polyline(PackedVector2Array([Vector2(-9, y), Vector2(9, y), Vector2(0, y + 10), Vector2(-9, y)]), Color(0.2, 0.12, 0, 0.8), 2.0)
+		var y := -178.0 + sin(t * 5.0) * 6.0
+		draw_colored_polygon(PackedVector2Array([Vector2(-16, y), Vector2(16, y), Vector2(0, y + 20)]), Color(1, 0.9, 0.4))
+		draw_polyline(PackedVector2Array([Vector2(-16, y), Vector2(16, y), Vector2(0, y + 20), Vector2(-16, y)]), Color(0.2, 0.12, 0, 0.8), 2.0)
 
 
 func _star(c: Vector2, r: float, col: Color) -> void:
