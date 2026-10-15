@@ -38,6 +38,9 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 				if sc <= 0.0:
 					continue
 				sc += tile_bonus - float(sk["tp"]) * 1.5
+				# Refined arts already bake branch stats into u.skill(); nudge AI to prefer them.
+				if u.use_gdd_rules and String(u.skill_branches.get(sid, "")) != "":
+					sc += 1.25
 				# Only accept lethal ZoC risk when the attack itself is expected to finish the fight.
 				if risk >= float(u.hp) * 0.6 and sc < 30.0:
 					continue
@@ -50,6 +53,7 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 			best["target"] = best["move"]
 	if u.use_gdd_rules:
 		best = _gdd_support(state, u, reach, best, foes, holding)
+		best = _gdd_mission(state, u, reach, best)
 	return best
 
 
@@ -259,3 +263,54 @@ static func _nearest_dist(p: Vector2i, foes: Array, gdd := false) -> int:
 	for f in foes:
 		best = mini(best, Pathing.chebyshev(p, f.pos) if gdd else Pathing.manhattan(p, f.pos))
 	return best
+
+## B2 pickup+evacuate: player AI takes the shared chest then walks to the exit.
+static func _gdd_mission(state: BattleState, u: BattleUnit, reach: Dictionary, best: Dictionary) -> Dictionary:
+	if state.win_type != "pickup_evacuate" or u.team != BattleUnit.PLAYER:
+		return best
+	var score := float(best["score"])
+	var ends: Array = reach.get("ends", [u.pos])
+	var cost: Dictionary = reach.get("cost", {})
+	if not state.chest_taken():
+		var chest: Vector2i = state.mission_chest()
+		var pickup_ap := int(state.mission.get("pickup_ap", 2))
+		# Already adjacent with enough leftover AP after standing still / moving here.
+		for tile in ends:
+			var spent := int(cost.get(tile, 0 if tile == u.pos else 999))
+			if spent > u.ap:
+				continue
+			var d: Vector2i = tile - chest
+			if maxi(absi(d.x), absi(d.y)) != 1:
+				continue
+			if u.ap - spent < pickup_ap:
+				# Move adjacent this turn; pick up next action.
+				var approach := 14.0 - float(spent) * 0.2
+				if approach > score and best.get("skill", "") == "":
+					best = {"score": approach, "move": tile, "skill": "", "target": Vector2i(-1, -1)}
+					score = approach
+				continue
+			var pick_score := 28.0 - float(spent) * 0.15
+			if pick_score > score:
+				best = {"score": pick_score, "move": tile, "skill": "__take_chest__", "target": tile}
+				score = pick_score
+	else:
+		var exit_tile: Vector2i = state.mission_exit()
+		if ends.has(exit_tile):
+			var spent := int(cost.get(exit_tile, 0 if exit_tile == u.pos else 999))
+			var evacuate := 40.0 - float(spent) * 0.1
+			if evacuate > score:
+				best = {"score": evacuate, "move": exit_tile, "skill": "", "target": Vector2i(-1, -1)}
+		else:
+			# Closest reachable tile toward the exit.
+			var best_tile = best["move"]
+			var best_d := 999
+			for tile in ends:
+				var d := absi(tile.x - exit_tile.x) + absi(tile.y - exit_tile.y)
+				if d < best_d:
+					best_d = d
+					best_tile = tile
+			var chase := 18.0 - float(best_d) * 1.5
+			if chase > score and best.get("skill", "") == "":
+				best = {"score": chase, "move": best_tile, "skill": "", "target": Vector2i(-1, -1)}
+	return best
+

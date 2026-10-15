@@ -55,6 +55,8 @@ func _run_all() -> void:
 		"test_ai_gdd_rest_and_guard", "test_ai_gdd_lightfoot_approach",
 		"test_party_refine_spend_and_switch", "test_party_mastery_slot_at_level_4",
 		"test_refine_pofeng_branches_in_combat", "test_mastery_ningfeng_pierce",
+		"test_wuxia_b2_setup_and_mission", "test_chapter_b2_rewards",
+		"test_bamboo_battle_entry_and_return", "test_wuxia_b3_stub_loads",
 	]
 	for t in tests:
 		_current = t
@@ -1028,6 +1030,14 @@ func test_chapter_event_conditions_and_rewards() -> void:
 	eq(s.quest_state, ChapterState.QuestState.S3_ROUTE_SET, "route objective")
 	check(s.can_event("shrine_battle_start"), "shrine does not require B2")
 	check(s.can_event("bamboo_battle_start"), "optional bamboo available")
+	check(s.apply_event("bamboo_battle_start"), "B2 entry grants nothing")
+	check(not s.apply_event("b2_clear"), "B2 requires a victory result")
+	check(s.apply_event("b2_clear", {"result": "win"}), "submit B2 victory")
+	eq(s.experience, 180, "B1+B2 exp 100+80")
+	check(s.unlocked_manuals.has("截脉指"), "B2 unlocks 截脉指")
+	check(not s.apply_event("b2_clear", {"result": "win"}), "B2 victory cannot repeat")
+	check(not s.can_event("bamboo_battle_start"), "cleared bamboo cannot reopen")
+	check(s.can_event("shrine_battle_start"), "shrine still available after B2")
 	check(not s.complete, "minimum slice never falsely completes chapter")
 	s.b3_clear = true
 	s.ledger_received = true
@@ -1244,12 +1254,11 @@ func test_exploration_doors_and_collision() -> void:
 	Input.action_release("explore_right")
 	check(scene.player.position.x <= river_edge - ExplorationRules.BODY_RADIUS + 0.1, "physical river collision stops movement")
 	var half_view: Vector2 = scene.get_viewport_rect().size / scene.camera.zoom / 2
-	var map_size := Vector2(48, 30) * ExplorationRules.TILE
-	check(scene.camera.position.x >= half_view.x and scene.camera.position.x <= map_size.x - half_view.x, "camera constrained horizontally")
-	if map_size.y >= half_view.y * 2:
-		check(scene.camera.position.y >= half_view.y and scene.camera.position.y <= map_size.y - half_view.y, "camera constrained vertically")
-	else:
-		eq(scene.camera.position.y, map_size.y / 2, "camera centers maps smaller than viewport")
+	var bounds := ExploreIso.iso_bounds(48, 30)
+	check(scene.camera.position.x >= bounds.position.x - 1 and scene.camera.position.x <= bounds.end.x + 1, "iso camera stays in map X")
+	check(scene.camera.position.y >= bounds.position.y - 1 and scene.camera.position.y <= bounds.end.y + 1, "iso camera stays in map Y")
+	var expected_iso := ExploreIso.world_to_iso(scene.player.position)
+	check(scene.camera.position.distance_to(expected_iso) < half_view.length(), "iso camera tracks player")
 	scene.player.position = ExplorationRules.center(ExplorationRules.OUTDOOR_POINTS["bamboo_event"]) + Vector2(0, 38)
 	scene.interact("bamboo_event")
 	check(scene.modal_title.text.contains("线索不足"), "bamboo reachable before quest unlock")
@@ -1257,7 +1266,7 @@ func test_exploration_doors_and_collision() -> void:
 	game.chapter.apply_event("b1_clear", {"result": "win"})
 	game.chapter.apply_event("choose_sect")
 	scene.interact("bamboo_event")
-	check(scene.modal_text.text.contains("后续开放"), "eligible bamboo shows later opening")
+	check(scene.modal_title.text.contains("竹林遗匣") and scene.modal_text.text.contains("取匣"), "eligible bamboo offers B2 confirm")
 	scene.player.position = ExplorationRules.center(ExplorationRules.OUTDOOR_POINTS["shrine_event"]) + Vector2(0, 38)
 	scene.interact("shrine_event")
 	check(scene.modal_text.text.contains("无需先去竹林"), "shrine never requires B2")
@@ -2919,3 +2928,118 @@ func test_mastery_ningfeng_pierce() -> void:
 		if str(lab).contains("凝锋"):
 			labeled = true
 	check(labeled, "label mentions 凝锋")
+
+
+func test_wuxia_b2_setup_and_mission() -> void:
+	var s := BattleDefs.build_wuxia_b2(7)
+	eq(s.map.width, 12, "B2 width 12")
+	eq(s.map.height, 12, "B2 height 12")
+	eq(s.units.size(), 6, "3 allies + 3 bandits")
+	eq(s.win_type, "pickup_evacuate", "B2 mission win type")
+	eq(s.mission_chest(), Vector2i(9, 2), "chest at Q")
+	eq(s.mission_exit(), Vector2i(10, 9), "exit at E")
+	check(s.map.get_terrain(Vector2i(5, 5)) == "low_wall", "low wall h")
+	check(s.map.get_terrain(Vector2i(7, 4)) == "mud", "mud m")
+	check(s.map.get_terrain(Vector2i(0, 0)) == "wall", "bamboo wall")
+	# Killing all enemies without the chest does not win.
+	for u in s.living(BattleUnit.ENEMY):
+		u.hp = 0
+	eq(s.outcome(), "", "no win before pickup+evacuate")
+	# Soft-lock safe shared pickup.
+	var ally: BattleUnit = s.living(BattleUnit.PLAYER)[0]
+	s.current_id = ally.id
+	ally.pos = Vector2i(9, 3)
+	ally.ap = 6
+	check(s.can_take_chest(ally), "adjacent ally can take chest")
+	check(s.take_chest(ally), "take chest spends AP")
+	eq(ally.ap, 4, "pickup costs 2 AP")
+	check(s.chest_taken(), "shared mission item set")
+	eq(s.outcome(), "", "still need evacuate")
+	ally.pos = s.mission_exit()
+	eq(s.outcome(), "win", "taken + living on exit wins")
+	# Defeat still loses.
+	s = BattleDefs.build_wuxia_b2(3)
+	for u in s.living(BattleUnit.PLAYER):
+		u.hp = 0
+	eq(s.outcome(), "lose", "full party down loses B2")
+	var leap_map := BattleDefs.build_map("wuxia_b2")
+	check(bool(Terrain.info(leap_map.get_terrain(Vector2i(5, 6))).get("leap_over", false)), "low wall leap_over")
+
+
+func test_chapter_b2_rewards() -> void:
+	var s := ChapterState.new()
+	s.apply_event("quest_start")
+	s.apply_event("b1_clear", {"result": "win"})
+	var before := s.to_dict()
+	check(not s.apply_event("b2_clear", {"result": "win"}), "B2 blocked before stance")
+	eq(s.to_dict(), before, "rejected B2 changes nothing")
+	s.apply_event("choose_escort")
+	check(s.apply_event("b2_clear", {"result": "win"}), "B2 after stance")
+	check(s.b2_clear and s.unlocked_manuals.has("截脉指"), "flags and manual")
+	check(s.party.library.has("截脉指"), "library has 截脉指")
+	var path := "user://ch01_test_b2.json"
+	eq(s.save_to_file(path), OK, "save with B2")
+	var loaded := ChapterState.load_from_file(path)
+	check(loaded != null and loaded.b2_clear, "load B2 progress")
+	if loaded != null:
+		eq(loaded.to_dict(), s.to_dict(), "B2 round trip")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func test_bamboo_battle_entry_and_return() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	var old_step: int = game.step
+	game.shot = "explore"
+	game.step = 4
+	for result in ["lose", "win"]:
+		game.chapter = ChapterState.new()
+		game.chapter.apply_event("quest_start")
+		game.chapter.apply_event("b1_clear", {"result": "win"})
+		game.chapter.apply_event("choose_sect")
+		game.chapter.player_position = ExplorationRules.center(Vector2i(16, 7)) + Vector2(0, 20)
+		game.chapter.visited_areas.assign(["outdoor"])
+		game.chapter.facing = "N"
+		var entry: Dictionary = game.chapter.to_dict()
+		check(game.begin_bamboo_battle(game.chapter.player_position), "exploration enters B2")
+		eq(game.current_battle, "wuxia_b2", "B2 battle id")
+		await scene_changed
+		var battle = current_scene
+		eq(battle.state.win_type, "pickup_evacuate", "mission wired into scene")
+		if is_instance_valid(battle.overlay):
+			battle.overlay.queue_free()
+			battle.overlay = null
+		battle._finish(result)
+		battle.overlay_confirm.call()
+		await scene_changed
+		var explore = current_scene
+		if result == "lose":
+			eq(game.chapter.to_dict(), entry, "B2 defeat restores snapshot")
+		else:
+			check(game.chapter.b2_clear, "B2 victory submits flag")
+			check(game.chapter.unlocked_manuals.has("截脉指"), "B2 scene reward")
+			eq(explore.player.position, ExplorationRules.center(Vector2i(16, 8)), "B2 safe return")
+			check(not game.begin_bamboo_battle(explore.player.position), "cleared B2 locked")
+		explore.queue_free()
+		current_scene = null
+		await process_frame
+	game.chapter = old_chapter
+	game.shot = old_shot
+	game.current_battle = old_battle
+	game.step = old_step
+
+
+func test_wuxia_b3_stub_loads() -> void:
+	var s := BattleDefs.build_wuxia_b3(5)
+	eq(s.map.width, 14, "B3 width")
+	eq(s.map.height, 14, "B3 height")
+	eq(s.units.size(), 7, "3 allies + 4 foes")
+	var leader_alive := false
+	for u in s.units:
+		if u.is_leader:
+			leader_alive = true
+	check(leader_alive, "stub marks shrine leader")
+	eq(BattleDefs.get_def("wuxia_b3")["name"], "青崖渡 · 废祠夺簿", "def name")
+

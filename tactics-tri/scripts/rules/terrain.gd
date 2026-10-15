@@ -24,6 +24,7 @@ const CODES := {
 	"r": "ruins", "n": "snow", "b": "bridge", "x": "wall",
 	# Wuxia B1 char-grid (青崖渡)
 	".": "grass", "~": "water", "=": "stone", "C": "crate", "m": "mud", "#": "wall",
+	"h": "low_wall",
 }
 
 const EFFECT_NAMES := {"fire": "燃烧", "ice": "冰冻"}

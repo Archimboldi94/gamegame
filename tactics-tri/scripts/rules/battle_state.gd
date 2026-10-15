@@ -15,7 +15,8 @@ var map: BattleMap
 var units: Array = []
 var order := TurnOrder.new()
 var rng := RandomNumberGenerator.new()
-var win_type := "all"  # "all" = defeat every enemy, "leader" = defeat the enemy leader
+var win_type := "all"  # "all" | "leader" | "pickup_evacuate"
+var mission: Dictionary = {}  # chest/exit/taken/pickup_ap for pickup_evacuate
 var current_id := -1
 var moved := false
 var acted := false
@@ -681,6 +682,52 @@ func outcome() -> String:
 		for u in units:
 			if u.team == BattleUnit.ENEMY and u.is_leader and not u.alive():
 				return "win"
+	if win_type == "pickup_evacuate":
+		if bool(mission.get("taken", false)):
+			var exit: Vector2i = mission["exit"]
+			for u in living(BattleUnit.PLAYER):
+				if u.pos == exit:
+					return "win"
+		return ""
 	if living(BattleUnit.ENEMY).is_empty():
 		return "win"
 	return ""
+
+
+## Adjacent (8-dir) to the chest, enough AP, and the shared mission item not yet taken.
+func can_take_chest(u: BattleUnit) -> bool:
+	if win_type != "pickup_evacuate" or u == null or not u.alive():
+		return false
+	if u.team != BattleUnit.PLAYER or bool(mission.get("taken", false)):
+		return false
+	if u.id != current_id:
+		return false
+	var cost := int(mission.get("pickup_ap", 2))
+	if u.ap < cost:
+		return false
+	var chest: Vector2i = mission["chest"]
+	var d: Vector2i = u.pos - chest
+	return maxi(absi(d.x), absi(d.y)) == 1
+
+
+## Spend AP to pick up the shared mission chest. Soft-lock safe: item is team-shared.
+func take_chest(u: BattleUnit) -> bool:
+	if not can_take_chest(u):
+		return false
+	var cost := int(mission.get("pickup_ap", 2))
+	u.ap -= cost
+	mission["taken"] = true
+	acted = true
+	return true
+
+
+func chest_taken() -> bool:
+	return bool(mission.get("taken", false))
+
+
+func mission_exit() -> Vector2i:
+	return mission.get("exit", Vector2i(-1, -1))
+
+
+func mission_chest() -> Vector2i:
+	return mission.get("chest", Vector2i(-1, -1))

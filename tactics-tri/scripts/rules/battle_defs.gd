@@ -136,12 +136,17 @@ const DEFS := {
 static func get_def(id: String) -> Dictionary:
 	if id == "wuxia_b1":
 		return {"name": "青崖渡 · 渡口截箱", "win": "all", "win_text": "击败全部劫客", "lose_text": "我方全灭", "sky": Color(0.45, 0.62, 0.78)}
+	if id == "wuxia_b2":
+		return {"name": "青崖渡 · 竹林遗匣", "win": "pickup_evacuate", "win_text": "取匣后至少一人撤离", "lose_text": "我方全灭", "sky": Color(0.40, 0.58, 0.48)}
+	if id == "wuxia_b3":
+		return {"name": "青崖渡 · 废祠夺簿", "win": "all", "win_text": "击败首领并取回渡簿（脚手架）", "lose_text": "我方全灭", "sky": Color(0.48, 0.44, 0.40)}
 	return DEFS[id]
 
 
 static func build_map(id: String) -> BattleMap:
-	if id == "wuxia_b1":
-		var map_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_map.json"))
+	if id in ["wuxia_b1", "wuxia_b2", "wuxia_b3"]:
+		var map_path := "res://data/wuxia/%s_map.json" % id.replace("wuxia_", "")
+		var map_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(map_path))
 		return BattleMap.from_char_grid(map_raw["terrain_grid"], map_raw.get("markers", {}))
 	var d: Dictionary = DEFS[id]
 	return BattleMap.from_rows(d["heights"], d["terrain"])
@@ -152,8 +157,23 @@ static func _vec_facing(arr: Array) -> int:
 
 
 static func build_wuxia_b1(seed := 7, party: PartyState = null) -> BattleState:
-	var map_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_map.json"))
-	var combat_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/b1_combat.json"))
+	return build_wuxia("wuxia_b1", seed, party)
+
+
+static func build_wuxia_b2(seed := 7, party: PartyState = null) -> BattleState:
+	return build_wuxia("wuxia_b2", seed, party)
+
+
+static func build_wuxia_b3(seed := 7, party: PartyState = null) -> BattleState:
+	return build_wuxia("wuxia_b3", seed, party)
+
+
+static func build_wuxia(id: String, seed := 7, party: PartyState = null) -> BattleState:
+	var key := id.replace("wuxia_", "")
+	var map_path := "res://data/wuxia/%s_map.json" % key
+	var combat_path := "res://data/wuxia/%s_combat.json" % key
+	var map_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(map_path))
+	var combat_raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(combat_path))
 	var map := BattleMap.from_char_grid(map_raw["terrain_grid"], map_raw.get("markers", {}))
 	var markers: Dictionary = map_raw.get("markers", {})
 	var units: Array = []
@@ -192,24 +212,41 @@ static func build_wuxia_b1(seed := 7, party: PartyState = null) -> BattleState:
 		var spots: Array = markers[marker_key]
 		u.pos = Vector2i(int(spots[0][0]), int(spots[0][1]))
 		u.facing = _vec_facing(definition["facing"])
-		# B1 is lost only when the whole party falls (GDD 25.1).
+		# Chapter battles are lost only when the whole party falls (GDD).
 		u.is_lord = false
-		u.title = "青崖渡同行" if u.team == BattleUnit.PLAYER else "渡口劫匪"
-		u.ai = "aggressive"
-		u.cls = "lancer" if u.weapon == "spear" else "swordsman"
+		var titles := {"wuxia_b1": "渡口劫匪", "wuxia_b2": "竹林劫匪", "wuxia_b3": "废祠残党"}
+		var enemy_title: String = String(titles.get(id, "敌兵"))
+		u.title = "青崖渡同行" if u.team == BattleUnit.PLAYER else enemy_title
+		u.ai = String(definition.get("ai", "aggressive"))
+		u.is_leader = bool(definition.get("leader", false))
+		u.cls = "lancer" if u.weapon == "spear" else ("thief" if u.weapon == "fist" else "swordsman")
 		if u.team == BattleUnit.PLAYER:
 			u.innate_trait = PartyState.TRAITS[PartyState.IDS[u.id]]
 			if party != null:
 				party.apply_to_unit(u)
 		units.append(u)
 	var s := BattleState.new()
-	s.setup(map, units, "all", seed)
+	var win := "pickup_evacuate" if id == "wuxia_b2" else "all"
+	s.setup(map, units, win, seed)
+	if id == "wuxia_b2":
+		var q: Array = markers["Q"][0]
+		var e: Array = markers["E"][0]
+		s.mission = {
+			"chest": Vector2i(int(q[0]), int(q[1])),
+			"exit": Vector2i(int(e[0]), int(e[1])),
+			"taken": false,
+			"pickup_ap": 2,
+		}
 	return s
 
 
 static func build_state(id: String, seed := 7, party: PartyState = null) -> BattleState:
 	if id == "wuxia_b1":
 		return build_wuxia_b1(seed, party)
+	if id == "wuxia_b2":
+		return build_wuxia_b2(seed, party)
+	if id == "wuxia_b3":
+		return build_wuxia_b3(seed, party)
 	var d: Dictionary = DEFS[id]
 	var units := []
 	var next_id := 0

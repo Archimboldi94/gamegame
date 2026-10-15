@@ -1,0 +1,11 @@
+{
+  "status": "B2《竹林遗匣》单位；技能表仍由 b1_combat.json 加载",
+  "units": [
+    {"id": 0, "name": "剑客", "side": "player", "facing": [0, -1], "hp": 31, "max_hp": 31, "strength": 4, "armor": 3, "accuracy": 5, "evasion": 5, "speed": 88, "qi": 12, "skills": ["破风剑", "回锋剑", "守关式"], "marker": "A", "inner": "归元诀", "lightfoot": "燕行步", "weapon": "sword"},
+    {"id": 1, "name": "枪客", "side": "player", "facing": [0, -1], "hp": 36, "max_hp": 36, "strength": 4, "armor": 4, "accuracy": 0, "evasion": 4, "speed": 61, "qi": 12, "skills": ["穿云枪", "挑枪", "横江刀"], "marker": "B", "inner": "苍松功", "lightfoot": "踏雪步", "weapon": "spear"},
+    {"id": 2, "name": "拳师", "side": "player", "facing": [0, -1], "hp": 33, "max_hp": 33, "strength": 3, "armor": 3, "accuracy": 3, "evasion": 7, "speed": 50, "qi": 12, "skills": ["震山掌", "截脉指", "守关式"], "marker": "D", "inner": "归元诀", "lightfoot": "踏雪步", "weapon": "fist"},
+    {"id": 3, "name": "近战劫客", "side": "enemy", "facing": [0, 1], "hp": 34, "max_hp": 34, "strength": 5, "armor": 3, "accuracy": 4, "evasion": 6, "speed": 70, "qi": 12, "skills": ["横江刀"], "marker": "1", "inner": "苍松功", "lightfoot": "踏雪步", "weapon": "blade"},
+    {"id": 4, "name": "游斗劫客", "side": "enemy", "facing": [-1, 1], "hp": 30, "max_hp": 30, "strength": 4, "armor": 2, "accuracy": 5, "evasion": 9, "speed": 78, "qi": 12, "skills": ["震山掌", "截脉指"], "marker": "2", "inner": "归元诀", "lightfoot": "燕行步", "weapon": "fist"},
+    {"id": 5, "name": "守匣劫客", "side": "enemy", "facing": [0, 1], "hp": 40, "max_hp": 40, "strength": 5, "armor": 4, "accuracy": 3, "evasion": 5, "speed": 55, "qi": 12, "skills": ["穿云枪", "守关式"], "marker": "3", "inner": "苍松功", "lightfoot": "踏雪步", "weapon": "spear", "ai": "hold"}
+  ]
+}

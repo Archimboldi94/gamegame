@@ -128,14 +128,22 @@ func commit_chapter_event(event_id: String, context: Dictionary = {}) -> bool:
 
 
 func begin_ferry_battle(entry_position: Vector2) -> bool:
-	if not chapter.can_event("ferry_battle_start") or not exploration_battle.is_empty():
+	return _begin_exploration_battle("ferry_battle_start", "wuxia_b1", entry_position)
+
+
+func begin_bamboo_battle(entry_position: Vector2) -> bool:
+	return _begin_exploration_battle("bamboo_battle_start", "wuxia_b2", entry_position)
+
+
+func _begin_exploration_battle(event_id: String, battle_id: String, entry_position: Vector2) -> bool:
+	if not chapter.can_event(event_id) or not exploration_battle.is_empty():
 		return false
 	chapter.scene_id = "outdoor"
 	chapter.player_position = ExplorationRules.valid_spawn("outdoor", entry_position)
 	if not save_chapter():
 		return false
-	exploration_battle = {"battle_id": "wuxia_b1", "snapshot": chapter.to_dict(), "deployed": PartyState.IDS.duplicate()}
-	current_battle = "wuxia_b1"
+	exploration_battle = {"battle_id": battle_id, "snapshot": chapter.to_dict(), "deployed": PartyState.IDS.duplicate()}
+	current_battle = battle_id
 	_change("battle")
 	return true
 
@@ -149,16 +157,27 @@ func finish_exploration_battle(result: String) -> bool:
 	if not is_exploration_battle():
 		return false
 	var before := chapter.to_dict()
+	var battle_id: String = String(exploration_battle.get("battle_id", ""))
 	chapter = ChapterState.from_dict(exploration_battle["snapshot"])
 	if result == "win":
-		if not chapter.apply_event("b1_clear", {"result": "win", "deployed": exploration_battle.get("deployed", PartyState.IDS)}):
+		var clear_event := "b2_clear" if battle_id == "wuxia_b2" else "b1_clear"
+		if not chapter.apply_event(clear_event, {"result": "win", "deployed": exploration_battle.get("deployed", PartyState.IDS)}):
 			chapter = ChapterState.from_dict(before)
 			return false
-		chapter.player_position = ExplorationRules.center(Vector2i(37, 22))
+		if battle_id == "wuxia_b2":
+			chapter.player_position = ExplorationRules.center(Vector2i(16, 8))
+		else:
+			chapter.player_position = ExplorationRules.center(Vector2i(37, 22))
 	if not save_chapter():
 		chapter = ChapterState.from_dict(before)
 		return false
-	explore_notice = "首胜 · 队伍收录《回锋剑谱》 · 出战成员各得 100 EXP\n可回听雨客栈：谱库学习装配、Esc 分配训练点、演武区领心得。" if result == "win" else "已退回战前入口，可再次调查渡口。"
+	if result == "win":
+		if battle_id == "wuxia_b2":
+			explore_notice = "竹林首通 · 队伍收录《截脉指》 · 出战成员各得 80 EXP\n可回客栈谱库复习指法；废祠不要求先完成竹林。"
+		else:
+			explore_notice = "首胜 · 队伍收录《回锋剑谱》 · 出战成员各得 100 EXP\n可回听雨客栈：谱库学习装配、Esc 分配训练点、演武区领心得。"
+	else:
+		explore_notice = "已退回战前入口，可再次调查。" if battle_id == "wuxia_b2" else "已退回战前入口，可再次调查渡口。"
 	exploration_battle.clear()
 	_change("explore")
 	return true
@@ -332,9 +351,14 @@ func _do_shot() -> void:
 		"vote":
 			step = 4
 			_change("vote")
-		"battle", "battlemain", "battlefx", "wuxia", "wuxia_b1":
+		"battle", "battlemain", "battlefx", "wuxia", "wuxia_b1", "wuxia_b2":
 			step = 2
-			current_battle = "wuxia_b1" if shot in ["wuxia", "wuxia_b1"] else "b1"
+			if shot == "wuxia_b2":
+				current_battle = "wuxia_b2"
+			elif shot in ["wuxia", "wuxia_b1"]:
+				current_battle = "wuxia_b1"
+			else:
+				current_battle = "b1"
 			_change("battle")
 		"battle2a", "battle2b":
 			step = 6

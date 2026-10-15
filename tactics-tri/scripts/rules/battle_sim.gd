@@ -20,8 +20,12 @@ static func run(battle_id: String, seed: int = 7, max_turns: int = 400, party: P
 			if path.size() >= 2 and u.hp < before_hp:
 				opportunity_hits += 1
 		if plan["skill"] != "" and u.alive():
-			if state.is_valid_target(u, plan["skill"], plan["target"]) or SkillDB.get_skill(plan["skill"])["kind"] == "self":
-				state.execute(u, plan["skill"], plan["target"])
+			var sid: String = plan["skill"]
+			if sid == "__take_chest__":
+				if state.take_chest(u):
+					actions += 1
+			elif state.is_valid_target(u, sid, plan["target"]) or SkillDB.get_skill(sid)["kind"] == "self":
+				state.execute(u, sid, plan["target"])
 				actions += 1
 		state.end_turn()
 		turns += 1

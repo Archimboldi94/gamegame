@@ -67,6 +67,8 @@ func can_event(event_id: String, context: Dictionary = {}) -> bool:
 			return b1_clear and stance == ""
 		"bamboo_battle_start":
 			return b1_clear and stance != "" and not b2_clear
+		"b2_clear":
+			return b1_clear and stance != "" and not b2_clear and context.get("result", "") == "win"
 		"shrine_battle_start":
 			return b1_clear and stance != "" and not b3_clear
 	return false
@@ -95,6 +97,13 @@ func apply_event(event_id: String, context: Dictionary = {}) -> bool:
 		"choose_sect":
 			stance = "sect"
 			sect_relation += 1
+		"b2_clear":
+			b2_clear = true
+			if not unlocked_manuals.has("截脉指"):
+				unlocked_manuals.append("截脉指")
+			experience += 80
+			party.collect("截脉指")
+			party.award_battle_exp(80, context.get("deployed", PartyState.IDS))
 	# Battle-start events deliberately grant and change nothing.
 	return true
 
@@ -152,6 +161,10 @@ static func from_dict(data: Dictionary) -> ChapterState:
 	if s.b1_clear and (not s.quest_accepted or not s.unlocked_manuals.has("回锋剑谱") or s.experience < 100):
 		return null
 	if (s.lesson_received or s.stance != "" or s.b2_clear or s.b3_clear) and not s.b1_clear:
+		return null
+	if s.b2_clear and (s.stance == "" or not s.unlocked_manuals.has("截脉指") or s.experience < 180):
+		return null
+	if s.b2_clear and data["version"] == 2 and not s.party.library.has("截脉指"):
 		return null
 	if s.complete and not (s.b3_clear and s.ledger_received):
 		return null

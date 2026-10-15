@@ -716,16 +716,29 @@ func _ai_turn(u: BattleUnit) -> void:
 	if plan["move"] != u.pos:
 		var path := state.move_unit(u, plan["move"])
 		await _animate_path(u, path)
-	if plan["skill"] != "":
+		var after_move := state.outcome()
+		if after_move != "":
+			_finish(after_move)
+			return
+	if plan["skill"] != "" and u.alive():
 		var sid: String = plan["skill"]
-		var tgt: Vector2i = plan["target"]
-		var sk := SkillDB.get_skill(sid)
-		for p in Combat.affected_tiles(sk, u.pos, tgt, state.map):
-			_set_hl(p, COL_AREA, true)
-		_banner(sk["name"], COL_ENEMY if u.team == BattleUnit.ENEMY else COL_PLAYER, 0.4)
-		await _wait(0.35)
-		_clear_hl()
-		await _perform(u, sid, tgt)
+		if sid == "__take_chest__":
+			if state.take_chest(u):
+				_banner("取匣", COL_PLAYER, 0.45)
+				await _wait(0.3)
+			var after_pick := state.outcome()
+			if after_pick != "":
+				_finish(after_pick)
+				return
+		else:
+			var tgt: Vector2i = plan["target"]
+			var sk := SkillDB.get_skill(sid)
+			for p in Combat.affected_tiles(sk, u.pos, tgt, state.map):
+				_set_hl(p, COL_AREA, true)
+			_banner(sk["name"], COL_ENEMY if u.team == BattleUnit.ENEMY else COL_PLAYER, 0.4)
+			await _wait(0.35)
+			_clear_hl()
+			await _perform(u, sid, tgt)
 	state.end_turn()
 	unit_nodes[u.id].face()
 	_refresh_all()
@@ -747,9 +760,13 @@ func _finish(result: String) -> void:
 		get_tree().quit(0 if result == "win" or result == "lose" else 1)
 		return
 	if Game.is_exploration_battle():
+		var win_body := "封箱已夺回。回到渡口后收录剑谱，记录经验100。"
+		var lose_body := "返回战前入口，保留原有章节进度。"
+		if Game.current_battle == "wuxia_b2":
+			win_body = "遗匣已取出并撤离。回到竹林后收录《截脉指》，记录经验80。"
 		overlay = _overlay_panel([
 			["胜  利" if result == "win" else "暂  退", 96, UIKit.GOLD],
-			["封箱已夺回。回到渡口后收录剑谱，记录经验100。" if result == "win" else "返回战前入口，保留原有章节进度。", 34, UIKit.IVORY],
+			[win_body if result == "win" else lose_body, 34, UIKit.IVORY],
 		], [["返回青崖渡", _return_to_exploration.bind(result)]])
 		return
 	if result == "win":
@@ -848,14 +865,49 @@ func _enter_main() -> void:
 	var attack_label := "攻击 · %s" % basic["name"]
 	if u.use_gdd_rules:
 		attack_label += " · " + _skill_cost(basic)
-	_set_menu([
+	var items: Array = [
 		[attack_label, _on_attack, can_attack],
 		["技能", _on_skills, can_skill if u.use_gdd_rules else not state.acted],
 		["撤销移动", _on_undo, state.can_undo_move()],
-		["待机（结束）", _end_turn, true],
-	], _menu_title(u))
+	]
+	if state.win_type == "pickup_evacuate" and state.can_take_chest(u):
+		items.append(["取匣 · AP2", _on_take_chest, true])
+	items.append(["待机（结束）", _end_turn, true])
+	_set_menu(items, _menu_title(u))
+	if state.win_type == "pickup_evacuate":
+		_show_mission_tiles()
 	_clear_preview()
 	_show_info(u)
+
+
+func _show_mission_tiles() -> void:
+	if state.win_type != "pickup_evacuate":
+		return
+	var chest: Vector2i = state.mission_chest()
+	var exit_tile: Vector2i = state.mission_exit()
+	if not state.chest_taken():
+		_set_edge(chest, Color(1.0, 0.85, 0.25, 0.95))
+		for n in state.map.neighbors(chest):
+			if state.map.is_passable(n):
+				_set_hl(n, Color(1.0, 0.9, 0.35, 0.28), true)
+	else:
+		_set_edge(exit_tile, Color(0.35, 1.0, 0.55, 0.95))
+		_set_hl(exit_tile, Color(0.3, 0.95, 0.5, 0.4), true)
+
+
+func _on_take_chest() -> void:
+	var u := state.current()
+	if not state.take_chest(u):
+		_banner("无法取匣", Color(1, 0.6, 0.4), 0.5)
+		_enter_main()
+		return
+	_banner("取匣成功 · 队伍共享遗匣", Color(1.0, 0.88, 0.4), 0.7)
+	_hint("遗匣已取。抵达高亮撤离格即可完成。")
+	var oc := state.outcome()
+	if oc != "":
+		_finish(oc)
+		return
+	_enter_main()
 
 
 func _show_control_zones(u: BattleUnit) -> void:
