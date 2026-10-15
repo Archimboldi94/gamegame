@@ -102,7 +102,9 @@ const KEY_PAN_DELAY_MS := 180
 
 func _ready() -> void:
 	def = BattleDefs.get_def(Game.current_battle)
-	state = BattleDefs.build_state(Game.current_battle, 7 if Game.shot != "" or Game.autoplay != "" else randi(), Game.chapter.party if Game.is_exploration_battle() else null)
+	var explore_party: PartyState = Game.chapter.party if Game.is_exploration_battle() else null
+	var explore_stance := Game.chapter.stance if Game.is_exploration_battle() else ""
+	state = BattleDefs.build_state(Game.current_battle, 7 if Game.shot != "" or Game.autoplay != "" else randi(), explore_party, explore_stance)
 	view = IsoView.new()
 	view.configure(state.map.width, state.map.height)
 	_build_world()
@@ -716,6 +718,7 @@ func _ai_turn(u: BattleUnit) -> void:
 	if plan["move"] != u.pos:
 		var path := state.move_unit(u, plan["move"])
 		await _animate_path(u, path)
+		await _show_pending_traps()
 		var after_move := state.outcome()
 		if after_move != "":
 			_finish(after_move)
@@ -724,7 +727,7 @@ func _ai_turn(u: BattleUnit) -> void:
 		var sid: String = plan["skill"]
 		if sid == "__take_chest__":
 			if state.take_chest(u):
-				_banner("取匣", COL_PLAYER, 0.45)
+				_banner(_pickup_name(), COL_PLAYER, 0.45)
 				await _wait(0.3)
 			var after_pick := state.outcome()
 			if after_pick != "":
@@ -764,6 +767,8 @@ func _finish(result: String) -> void:
 		var lose_body := "返回战前入口，保留原有章节进度。"
 		if Game.current_battle == "wuxia_b2":
 			win_body = "遗匣已取出并撤离。回到竹林后收录《截脉指》，记录经验80。"
+		elif Game.current_battle == "wuxia_b3":
+			win_body = "首领已败，渡簿入手。回到废祠前，出战成员各得 140 EXP。不重复发放《回锋剑谱》。"
 		overlay = _overlay_panel([
 			["胜  利" if result == "win" else "暂  退", 96, UIKit.GOLD],
 			[win_body if result == "win" else lose_body, 34, UIKit.IVORY],
@@ -870,39 +875,63 @@ func _enter_main() -> void:
 		["技能", _on_skills, can_skill if u.use_gdd_rules else not state.acted],
 		["撤销移动", _on_undo, state.can_undo_move()],
 	]
-	if state.win_type == "pickup_evacuate" and state.can_take_chest(u):
-		items.append(["取匣 · AP2", _on_take_chest, true])
+	if state._is_pickup() and state.can_take_chest(u):
+		items.append(["%s · AP2" % _pickup_name(), _on_take_chest, true])
+	elif state.win_type == "leader_pickup" and state.adjacent_to_mission(u) and not state.leader_fallen():
+		items.append(["取簿 · 须先击败首领", _on_take_chest, false])
 	items.append(["待机（结束）", _end_turn, true])
 	_set_menu(items, _menu_title(u))
-	if state.win_type == "pickup_evacuate":
+	if state._is_pickup():
 		_show_mission_tiles()
 	_clear_preview()
 	_show_info(u)
 
 
+func _pickup_name() -> String:
+	return "取簿" if state.win_type == "leader_pickup" else "取匣"
+
+
 func _show_mission_tiles() -> void:
-	if state.win_type != "pickup_evacuate":
+	if not state._is_pickup():
 		return
 	var chest: Vector2i = state.mission_chest()
-	var exit_tile: Vector2i = state.mission_exit()
 	if not state.chest_taken():
 		_set_edge(chest, Color(1.0, 0.85, 0.25, 0.95))
 		for n in state.map.neighbors(chest):
 			if state.map.is_passable(n):
 				_set_hl(n, Color(1.0, 0.9, 0.35, 0.28), true)
-	else:
+	elif state.win_type == "pickup_evacuate":
+		var exit_tile: Vector2i = state.mission_exit()
 		_set_edge(exit_tile, Color(0.35, 1.0, 0.55, 0.95))
 		_set_hl(exit_tile, Color(0.3, 0.95, 0.5, 0.4), true)
+
+
+func _show_pending_traps() -> void:
+	for e in state.pending_traps:
+		var t: BattleUnit = e["unit"]
+		if not unit_nodes.has(t.id):
+			continue
+		var n = unit_nodes[t.id]
+		n.flash(Color(0.85, 0.35, 0.2), 0.8, 0.25)
+		fx.number(n.body_pos() + Vector2(0, -70), "陷阱 %d" % int(e["amount"]), Color(1.0, 0.45, 0.3))
+		n.drain_hp(t.hp)
+		if e.get("killed", false):
+			await n.die().finished
+	state.pending_traps = []
 
 
 func _on_take_chest() -> void:
 	var u := state.current()
 	if not state.take_chest(u):
-		_banner("无法取匣", Color(1, 0.6, 0.4), 0.5)
+		_banner("无法%s" % _pickup_name(), Color(1, 0.6, 0.4), 0.5)
 		_enter_main()
 		return
-	_banner("取匣成功 · 队伍共享遗匣", Color(1.0, 0.88, 0.4), 0.7)
-	_hint("遗匣已取。抵达高亮撤离格即可完成。")
+	if state.win_type == "leader_pickup":
+		_banner("取簿成功 · 渡簿归入队伍", Color(1.0, 0.88, 0.4), 0.7)
+		_hint("渡簿已取。")
+	else:
+		_banner("取匣成功 · 队伍共享遗匣", Color(1.0, 0.88, 0.4), 0.7)
+		_hint("遗匣已取。抵达高亮撤离格即可完成。")
 	var oc := state.outcome()
 	if oc != "":
 		_finish(oc)
@@ -955,7 +984,8 @@ func _show_reach(u: BattleUnit, stand: Array) -> void:
 	for s in stand:
 		if u.use_gdd_rules:
 			var step_cost: int = move_info.get("cost", {}).get(s, 0)
-			if not state.skill_usable(u, u.basic) or step_cost + int(u.skill(u.basic) if u.use_gdd_rules else SkillDB.get_skill(u.basic).get("ap", 0)) > u.ap:
+			var attack_ap := int(u.skill(u.basic).get("ap", 0))
+			if not state.skill_usable(u, u.basic) or step_cost + attack_ap > u.ap:
 				continue
 		for p in state.target_tiles(u, u.basic, s):
 			reach[p] = true
@@ -1518,6 +1548,11 @@ func _secondary(e: Dictionary, att: BattleUnit, shown: Dictionary) -> void:
 			n.queue_redraw()
 			unit_nodes[by.id].queue_redraw()
 			await _wait(0.15)
+		"trap":
+			n.flash(Color(0.85, 0.35, 0.2), 0.8, 0.25)
+			fx.number(n.body_pos() + Vector2(0, -70), "陷阱 %d" % int(e["amount"]), Color(1.0, 0.45, 0.3))
+			n.drain_hp(t.hp)
+			await _wait(0.2)
 		"delay":
 			n.flash(Color(0.6, 0.9, 1.0), 0.8, 0.35)
 			fx.burst(n.body_pos(), Color(0.6, 0.9, 1.0), 8, 70.0, 0.3, -120.0, 6.0)
@@ -1962,6 +1997,7 @@ func _do_move(cell: Vector2i) -> void:
 	var u := state.current()
 	var path := state.move_unit(u, cell)
 	await _animate_path(u, path)
+	await _show_pending_traps()
 	_refresh_all()
 	if u.use_gdd_rules:
 		var result := state.outcome()

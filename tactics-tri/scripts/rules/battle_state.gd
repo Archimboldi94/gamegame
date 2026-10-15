@@ -15,8 +15,9 @@ var map: BattleMap
 var units: Array = []
 var order := TurnOrder.new()
 var rng := RandomNumberGenerator.new()
-var win_type := "all"  # "all" | "leader" | "pickup_evacuate"
-var mission: Dictionary = {}  # chest/exit/taken/pickup_ap for pickup_evacuate
+var win_type := "all"  # "all" | "leader" | "pickup_evacuate" | "leader_pickup"
+var mission: Dictionary = {}  # chest/exit/taken/pickup_ap; B3 also trap_damage/spent_traps/stance
+var pending_traps: Array = []
 var current_id := -1
 var moved := false
 var acted := false
@@ -188,6 +189,7 @@ func can_move(u: BattleUnit) -> bool:
 
 
 func move_unit(u: BattleUnit, to: Vector2i) -> Array:
+	pending_traps = []
 	if to == u.pos:
 		moved = true
 		return [u.pos]
@@ -219,6 +221,10 @@ func move_unit(u: BattleUnit, to: Vector2i) -> Array:
 			u.pos = step_to
 			u.moved_tiles += 1
 			u.facing = Combat.dir_toward(from, step_to, u.facing)
+			pending_traps.append_array(_enter_trap(u))
+			if not u.alive():
+				path = path.slice(0, i + 1)
+				break
 		moved = true
 		u.facing = auto_facing(u)
 		return path
@@ -473,6 +479,10 @@ func execute(u: BattleUnit, sid: String, tile: Vector2i) -> Array:
 					u.moved_tiles += 1
 					u.facing = Combat.dir_toward(old, dest, u.facing)
 					events.append({"type": "leap", "unit": u, "from": old, "to": dest})
+					var traps := _enter_trap(u)
+					events.append_array(traps)
+					if not u.alive():
+						break
 				if u.alive() and u.pos == tile and bool(sk.get("landing_guard", false)):
 					u.gain_guard()
 					events.append({"type": "buff", "unit": u, "text": "护势"})
@@ -689,16 +699,63 @@ func outcome() -> String:
 				if u.pos == exit:
 					return "win"
 		return ""
+	if win_type == "leader_pickup":
+		if leader_fallen() and chest_taken():
+			return "win"
+		return ""
 	if living(BattleUnit.ENEMY).is_empty():
 		return "win"
 	return ""
 
 
-## Adjacent (8-dir) to the chest, enough AP, and the shared mission item not yet taken.
+func _is_pickup() -> bool:
+	return win_type == "pickup_evacuate" or win_type == "leader_pickup"
+
+
+## True only after the marked enemy leader has actually fallen.
+func leader_fallen() -> bool:
+	var found := false
+	for u in units:
+		if u.team == BattleUnit.ENEMY and u.is_leader:
+			found = true
+			if u.alive():
+				return false
+	return found
+
+
+func trap_spent(cell: Vector2i) -> bool:
+	return (mission.get("spent_traps", []) as Array).has(cell)
+
+
+## One-shot tile. Suggested damage lives on the mission so tests can read it.
+func _enter_trap(u: BattleUnit) -> Array:
+	if u == null or not u.alive() or map.get_terrain(u.pos) != "trap" or trap_spent(u.pos):
+		return []
+	var spent: Array = (mission.get("spent_traps", []) as Array).duplicate()
+	spent.append(u.pos)
+	mission["spent_traps"] = spent
+	var dealt := u.take_damage(int(mission.get("trap_damage", 8)))
+	if not u.alive():
+		order.remove(u.id)
+	return [{"type": "trap", "unit": u, "amount": dealt, "killed": not u.alive(), "tile": u.pos}]
+
+
+func adjacent_to_mission(u: BattleUnit) -> bool:
+	if not _is_pickup() or u == null:
+		return false
+	var chest: Vector2i = mission.get("chest", Vector2i(-999, -999))
+	var d: Vector2i = u.pos - chest
+	return maxi(absi(d.x), absi(d.y)) == 1
+
+
+## Adjacent (8-dir) to the objective, enough AP, and the shared item not yet taken.
+## B3 also requires the shrine leader to be down; standing on the ledger early does nothing.
 func can_take_chest(u: BattleUnit) -> bool:
-	if win_type != "pickup_evacuate" or u == null or not u.alive():
+	if not _is_pickup() or u == null or not u.alive():
 		return false
 	if u.team != BattleUnit.PLAYER or bool(mission.get("taken", false)):
+		return false
+	if win_type == "leader_pickup" and not leader_fallen():
 		return false
 	if u.id != current_id:
 		return false

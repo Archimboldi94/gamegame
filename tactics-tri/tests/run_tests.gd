@@ -41,7 +41,8 @@ func _run_all() -> void:
 		"test_wuxia_hud_resources_intro_and_rounds", "test_wuxia_hud_forecast_and_control_zones",
 		"test_chapter_event_conditions_and_rewards", "test_chapter_stance_once_and_failure",
 		"test_chapter_save_round_trip", "test_exploration_movement_and_radius",
-		"test_exploration_outdoor_reachability", "test_exploration_scene_interactions",
+		"test_exploration_outdoor_reachability", "test_exploration_layout_and_props",
+		"test_exploration_scene_interactions",
 		"test_exploration_doors_and_collision",
 		"test_exploration_battle_return_flow",
 		"test_party_exp_curve_carry_cap", "test_party_exp_distribution_and_catchup",
@@ -56,7 +57,8 @@ func _run_all() -> void:
 		"test_party_refine_spend_and_switch", "test_party_mastery_slot_at_level_4",
 		"test_refine_pofeng_branches_in_combat", "test_mastery_ningfeng_pierce",
 		"test_wuxia_b2_setup_and_mission", "test_chapter_b2_rewards",
-		"test_bamboo_battle_entry_and_return", "test_wuxia_b3_stub_loads",
+		"test_bamboo_battle_entry_and_return", "test_wuxia_b3_mission_and_variants",
+		"test_chapter_b3_rewards", "test_shrine_battle_entry_and_return",
 	]
 	for t in tests:
 		_current = t
@@ -1149,6 +1151,34 @@ func test_exploration_outdoor_reachability() -> void:
 	var indoor_reached := _exploration_reachable(inn, ExplorationRules.INN_POINTS["inn_spawn"])
 	for cell in ExplorationRules.INN_POINTS.values():
 		check(indoor_reached.has(cell), "inn target accessible " + str(cell))
+
+
+func test_exploration_layout_and_props() -> void:
+	var rows := ExplorationRules.grid("outdoor")
+	var blob := "".join(rows)
+	check(blob.contains("~") and blob.contains("=") and blob.contains("m"), "river, street and mud bank")
+	check(blob.contains("#") and blob.contains("H"), "forest and house footprints")
+	eq(rows[23][41], "=", "pier plank at the ferry")
+	eq(rows[22][8], "=", "stone street leaves the inn")
+	check(ExploreDressing.count_kind("outdoor", "ferry") >= 1, "ferry boat prop")
+	check(ExploreDressing.count_kind("outdoor", "inn") >= 1, "inn building prop")
+	check(ExploreDressing.count_kind("outdoor", "shrine") >= 1, "shrine building prop")
+	check(ExploreDressing.count_kind("outdoor", "house") + ExploreDressing.count_kind("outdoor", "house_b") >= 2, "village houses")
+	check(ExploreDressing.count_kind("outdoor", "crate") >= 4, "cargo crates")
+	check(ExploreDressing.count_kind("outdoor", "bamboo") >= 20, "bamboo grove")
+	check(ExploreDressing.count_kind("outdoor", "tree") >= 20, "trees beyond the grove")
+	check(ExploreDressing.count_kind("outdoor", "post") >= 2, "mooring posts")
+	eq(ExploreIso.art_for("w"), "bridge", "wood floor reuses bridge planks")
+	eq(ExploreIso.art_for("="), "stone", "street reuses stone diamonds")
+	for kind in ["inn", "shrine", "ferry", "crate", "bamboo", "house", "counter", "shelf", "rack", "lantern"]:
+		check(FileAccess.file_exists(String(ExploreDressing.TEXTURES[kind])), "prop slice " + kind)
+	var inn := ExplorationRules.grid("inn")
+	check("".join(inn).contains("w"), "inn floor is wood")
+	check(ExploreDressing.count_kind("inn", "counter") >= 1, "inn counter")
+	check(ExploreDressing.count_kind("inn", "shelf") >= 1, "inn shelf")
+	check(ExploreDressing.count_kind("inn", "rack") >= 1, "inn weapon rack")
+	check(ExploreDressing.count_kind("inn", "table") >= 1, "inn table")
+	check(ExploreDressing.count_kind("inn", "lantern") >= 2, "inn lanterns")
 
 
 func test_exploration_scene_interactions() -> void:
@@ -2955,6 +2985,17 @@ func test_wuxia_b2_setup_and_mission() -> void:
 	eq(ally.ap, 4, "pickup costs 2 AP")
 	check(s.chest_taken(), "shared mission item set")
 	eq(s.outcome(), "", "still need evacuate")
+	# Cleared field: the survivor walks toward the chest instead of idling out of reach.
+	var far := BattleDefs.build_wuxia_b2(21)
+	for foe in far.living(BattleUnit.ENEMY):
+		foe.hp = 0
+	var sword: BattleUnit = far.unit_by_id(0)
+	far.current_id = sword.id
+	sword.ap = sword.max_ap
+	var before_d := absi(sword.pos.x - 9) + absi(sword.pos.y - 2)
+	var chase := EnemyAI.plan(far, sword)
+	var after_d := absi(chase["move"].x - 9) + absi(chase["move"].y - 2)
+	check(after_d < before_d, "cleared field steps toward the chest")
 	ally.pos = s.mission_exit()
 	eq(s.outcome(), "win", "taken + living on exit wins")
 	# Defeat still loses.
@@ -3031,15 +3072,200 @@ func test_bamboo_battle_entry_and_return() -> void:
 	game.step = old_step
 
 
-func test_wuxia_b3_stub_loads() -> void:
-	var s := BattleDefs.build_wuxia_b3(5)
-	eq(s.map.width, 14, "B3 width")
-	eq(s.map.height, 14, "B3 height")
-	eq(s.units.size(), 7, "3 allies + 4 foes")
-	var leader_alive := false
-	for u in s.units:
+func _route_to_ledger(map: BattleMap, start: Vector2i) -> bool:
+	var goals := {}
+	for d in BattleMap.DIRS:
+		var n: Vector2i = Vector2i(7, 2) + d
+		if map.is_passable(n):
+			goals[n] = true
+	var reached := {start: true}
+	var queue: Array[Vector2i] = [start]
+	var index := 0
+	while index < queue.size():
+		var point: Vector2i = queue[index]
+		index += 1
+		if goals.has(point):
+			return true
+		for d in BattleMap.DIRS:
+			var next: Vector2i = point + d
+			if reached.has(next) or Pathing.enter_cost(map, 99, point, next) < 0:
+				continue
+			reached[next] = true
+			queue.append(next)
+	return false
+
+
+func test_wuxia_b3_mission_and_variants() -> void:
+	var escort := BattleDefs.build_wuxia_b3(5, null, "escort")
+	eq(escort.map.width, 14, "B3 width")
+	eq(escort.map.height, 14, "B3 height")
+	eq(escort.units.size(), 7, "3 allies + 4 foes")
+	eq(escort.win_type, "leader_pickup", "leader then ledger")
+	eq(escort.mission_chest(), Vector2i(7, 2), "ledger at L")
+	eq(escort.mission.get("stance"), "escort", "escort variant tagged")
+	eq(escort.map.get_terrain(Vector2i(6, 4)), "shrine", "shrine stones")
+	eq(escort.map.get_terrain(Vector2i(7, 5)), "shrine", "shrine block")
+	eq(escort.map.get_terrain(Vector2i(2, 6)), "crate", "west crate")
+	eq(escort.map.get_terrain(Vector2i(11, 7)), "crate", "east crate")
+	eq(escort.map.get_terrain(Vector2i(6, 9)), "trap", "escort keeps the trap")
+	eq(escort.map.get_terrain(Vector2i(4, 9)), "cart", "escort parks the cart")
+	check(not escort.map.is_passable(Vector2i(4, 9)), "cart blocks the west lane")
+	check(not escort.map.is_passable(Vector2i(6, 4)), "shrine cannot be walked through")
+	var named := {}
+	for u in escort.units:
+		named[u.name] = u
+	eq((named["剑客"] as BattleUnit).pos, Vector2i(5, 11), "escort sword deploy")
+	eq((named["枪客"] as BattleUnit).pos, Vector2i(6, 11), "escort spear deploy")
+	eq((named["拳师"] as BattleUnit).pos, Vector2i(7, 11), "escort fist deploy")
+	check((named["废祠首领"] as BattleUnit).is_leader, "shrine leader marked")
+	var ally: BattleUnit = named["剑客"]
+	escort.current_id = ally.id
+	ally.pos = Vector2i(7, 1)
+	ally.ap = 6
+	check(not escort.can_take_chest(ally), "ledger stays locked while the leader lives")
+	check(not escort.take_chest(ally), "rejected take does nothing")
+	eq(ally.ap, 6, "rejected take spends no AP")
+	eq(escort.outcome(), "", "proximity alone does not win")
+	for u in escort.living(BattleUnit.ENEMY):
+		u.hp = 0
+	eq(escort.outcome(), "", "defeating the leader is not itself the win")
+	check(escort.leader_fallen() and escort.can_take_chest(ally), "adjacent take opens after the leader falls")
+	check(escort.take_chest(ally), "take the shared ledger")
+	eq(ally.ap, 4, "ledger costs 2 AP")
+	eq(escort.outcome(), "win", "leader down plus ledger wins")
+	var mid := BattleDefs.build_wuxia_b3(3)
+	var leader: BattleUnit
+	var sword: BattleUnit
+	for u in mid.units:
 		if u.is_leader:
-			leader_alive = true
-	check(leader_alive, "stub marks shrine leader")
+			leader = u
+		if u.name == "剑客":
+			sword = u
+	leader.hp = 0
+	mid.current_id = sword.id
+	sword.pos = Vector2i(8, 2)
+	sword.ap = 6
+	check(mid.living(BattleUnit.ENEMY).size() > 0, "guards still stand")
+	check(mid.take_chest(sword), "remaining guards do not block the ledger")
+	eq(mid.outcome(), "win", "B3 does not require a full wipe")
+	eq(mid.mission.get("stance"), "escort", "omitted stance uses the escort layout")
+	var lost := BattleDefs.build_wuxia_b3(1)
+	for u in lost.living(BattleUnit.PLAYER):
+		u.hp = 0
+	eq(lost.outcome(), "lose", "party wipe loses B3")
+	var trap := BattleDefs.build_wuxia_b3(2, null, "escort")
+	var walker: BattleUnit = trap.living(BattleUnit.PLAYER)[0]
+	trap.current_id = walker.id
+	walker.pos = Vector2i(6, 10)
+	walker.ap = 6
+	var before_hp := walker.hp
+	var stepped := trap.move_unit(walker, Vector2i(6, 9))
+	check(stepped.has(Vector2i(6, 9)), "trap tile can be entered")
+	eq(walker.hp, before_hp - 8, "trap deals the suggested 8 damage once")
+	walker.ap = 6
+	trap.move_unit(walker, Vector2i(6, 10))
+	var after_leave := walker.hp
+	walker.ap = 6
+	trap.move_unit(walker, Vector2i(6, 9))
+	eq(walker.hp, after_leave, "a spent trap does not fire again")
+	var sect := BattleDefs.build_wuxia_b3(4, null, "sect")
+	eq(sect.map.get_terrain(Vector2i(6, 9)), "grass", "sect removes the trap")
+	check(sect.map.is_passable(Vector2i(4, 9)), "sect does not place the cart")
+	var sect_pos := {}
+	for u in sect.units:
+		if u.team == BattleUnit.PLAYER:
+			sect_pos[u.name] = u.pos
+	eq(sect_pos["剑客"], Vector2i(7, 11), "sect sword deploy")
+	eq(sect_pos["枪客"], Vector2i(8, 11), "sect spear deploy")
+	eq(sect_pos["拳师"], Vector2i(9, 11), "sect fist deploy")
+	check(_route_to_ledger(escort.map, Vector2i(5, 11)), "escort route still reaches the ledger")
+	check(_route_to_ledger(sect.map, Vector2i(7, 11)), "sect route still reaches the ledger")
 	eq(BattleDefs.get_def("wuxia_b3")["name"], "青崖渡 · 废祠夺簿", "def name")
+	eq(BattleDefs.get_def("wuxia_b3")["win_text"], "击败首领后取回渡簿", "def win text")
+
+
+func test_chapter_b3_rewards() -> void:
+	var s := ChapterState.new()
+	s.apply_event("quest_start")
+	s.apply_event("b1_clear", {"result": "win"})
+	var before := s.to_dict()
+	check(not s.apply_event("b3_clear", {"result": "win"}), "B3 blocked before stance")
+	eq(s.to_dict(), before, "rejected B3 changes nothing")
+	s.apply_event("choose_sect")
+	check(s.apply_event("b3_clear", {"result": "win"}), "B3 does not require B2")
+	check(s.b3_clear and s.ledger_received and s.complete, "ledger, clear flag and chapter end")
+	check(s.unlocked_manuals.has("渡簿"), "ledger enters the inventory")
+	check(not s.unlocked_manuals.has("截脉指"), "skipping B2 grants no finger manual")
+	eq(s.experience, 240, "B1 100 plus B3 140")
+	eq(s.quest_state, ChapterState.QuestState.S5_COMPLETE, "chapter objective closes")
+	check(s.party.library.has("回锋剑") and not s.party.library.has("渡簿"), "ledger is not a second sword manual")
+	check(not s.apply_event("b3_clear", {"result": "win"}), "B3 victory cannot repeat")
+	check(not s.can_event("shrine_battle_start"), "cleared shrine cannot reopen")
+	var path := "user://ch01_test_b3.json"
+	eq(s.save_to_file(path), OK, "save with B3")
+	var loaded := ChapterState.load_from_file(path)
+	check(loaded != null and loaded.b3_clear and loaded.complete, "load B3 progress")
+	if loaded != null:
+		eq(loaded.to_dict(), s.to_dict(), "B3 round trip")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var both := ChapterState.new()
+	both.apply_event("quest_start")
+	both.apply_event("b1_clear", {"result": "win"})
+	both.apply_event("choose_escort")
+	both.apply_event("b2_clear", {"result": "win"})
+	both.apply_event("b3_clear", {"result": "win"})
+	eq(both.experience, 320, "B1+B2+B3 exp")
+	check(both.party.library.has("截脉指") and both.unlocked_manuals.has("渡簿"), "both rewards kept")
+
+
+func test_shrine_battle_entry_and_return() -> void:
+	var game = root.get_node("Game")
+	var old_chapter: ChapterState = game.chapter
+	var old_shot: String = game.shot
+	var old_battle: String = game.current_battle
+	var old_step: int = game.step
+	game.shot = "explore"
+	game.step = 4
+	for result in ["lose", "win"]:
+		game.chapter = ChapterState.new()
+		game.chapter.apply_event("quest_start")
+		game.chapter.apply_event("b1_clear", {"result": "win"})
+		game.chapter.apply_event("choose_escort" if result == "lose" else "choose_sect")
+		game.chapter.player_position = ExplorationRules.center(Vector2i(37, 8)) + Vector2(0, 20)
+		game.chapter.visited_areas.assign(["outdoor"])
+		game.chapter.facing = "N"
+		var entry: Dictionary = game.chapter.to_dict()
+		check(game.begin_shrine_battle(game.chapter.player_position), "exploration enters B3")
+		eq(game.current_battle, "wuxia_b3", "B3 battle id")
+		await scene_changed
+		var battle = current_scene
+		eq(battle.state.win_type, "leader_pickup", "mission wired into scene")
+		eq(battle.state.mission.get("stance"), "escort" if result == "lose" else "sect", "explore stance selects the variant")
+		if is_instance_valid(battle.overlay):
+			battle.overlay.queue_free()
+			battle.overlay = null
+		battle._finish(result)
+		battle.overlay_confirm.call()
+		await scene_changed
+		var explore = current_scene
+		if result == "lose":
+			eq(game.chapter.to_dict(), entry, "B3 defeat restores snapshot")
+		else:
+			check(game.chapter.b3_clear and game.chapter.ledger_received, "B3 victory submits the ledger")
+			check(game.chapter.complete, "chapter closes")
+			eq(explore.player.position, ExplorationRules.center(Vector2i(37, 10)), "B3 safe return")
+			check(not game.begin_shrine_battle(explore.player.position), "cleared B3 locked")
+			check(game.chapter.unlocked_manuals.has("回锋剑谱"), "original sword manual remains")
+			var sword_copies := 0
+			for manual in game.chapter.unlocked_manuals:
+				if manual == "回锋剑谱":
+					sword_copies += 1
+			eq(sword_copies, 1, "B3 does not grant the sword manual again")
+		explore.queue_free()
+		current_scene = null
+		await process_frame
+	game.chapter = old_chapter
+	game.shot = old_shot
+	game.current_battle = old_battle
+	game.step = old_step
 

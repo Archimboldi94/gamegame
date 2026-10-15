@@ -1,5 +1,5 @@
 {
-  "status": "B3 stub units",
+  "status": "B3《废祠夺簿》单位；技能表仍由 b1_combat.json 加载。默认/escort 西侧部署，sect 由关卡变体改坐标。",
   "units": [
     {
       "id": 0,

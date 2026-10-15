@@ -84,8 +84,34 @@ func _draw() -> void:
 		draw_texture(tree, Vector2(22, -79))
 	elif terrain == "ruins":
 		draw_texture(tex("res://assets/tiles/deco_rubble.png"), Vector2(-10, -40))
+	elif terrain == "crate" or terrain == "cart":
+		_draw_box(terrain == "cart")
+	elif terrain == "shrine":
+		_draw_stele()
+	elif terrain == "trap":
+		_draw_spikes()
 	if effect == "fire":
 		draw_texture_rect(tex("res://assets/tiles/fx_fire.png"), Rect2(-TW * 0.5, -TH, TW, TH * 1.5), false)
+
+
+func _draw_box(tall: bool) -> void:
+	var h := 34.0 if tall else 26.0
+	draw_rect(Rect2(-18, -h, 36, h), Color(0.56, 0.36, 0.20))
+	draw_rect(Rect2(-18, -h, 36, 5), Color(0.74, 0.52, 0.30))
+	draw_line(Vector2(-16, -h + 4), Vector2(14, -6), Color(0.32, 0.18, 0.10), 2.0)
+	draw_line(Vector2(14, -h + 4), Vector2(-16, -6), Color(0.32, 0.18, 0.10), 2.0)
+
+
+func _draw_stele() -> void:
+	draw_rect(Rect2(-12, -52, 24, 40), Color(0.62, 0.60, 0.54))
+	draw_rect(Rect2(-16, -14, 32, 8), Color(0.38, 0.36, 0.32))
+	draw_line(Vector2(-6, -44), Vector2(-6, -22), Color(0.40, 0.38, 0.34), 2.0)
+
+
+func _draw_spikes() -> void:
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(-20, 8), Vector2(-10, -18), Vector2(0, 4), Vector2(10, -18), Vector2(20, 8)
+	]), Color(0.62, 0.28, 0.16, 0.95))
 
 
 func _diamond(c: Color, s: float, outline := Color(0, 0, 0, 0)) -> void:

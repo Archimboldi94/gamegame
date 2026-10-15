@@ -9,7 +9,7 @@ const HS := IsoView.HS
 ## Blueprint char -> battle terrain art key (top_<art>_N.png).
 const CHAR_ART := {
 	".": "grass", ",": "grassdirt", "=": "stone", "~": "water",
-	"#": "forest", "H": "wall", "m": "mud",
+	"#": "forest", "H": "wall", "m": "mud", "w": "bridge",
 }
 
 
