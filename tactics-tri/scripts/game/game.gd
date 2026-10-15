@@ -34,6 +34,8 @@ var autoplay := ""  # --autoplay=<battle id>: AI plays both sides through the re
 var sim := ""  # --sim=<battle id>: headless both-sides AI batch, prints win-rate then quits
 var sim_seeds := 20
 var sim_out := ""
+var battle_stance := "" # --stance=escort|sect for simulation / screenshot / autoplay
+var sim_party_profile := "default" # --sim-party=default|after_b1|after_b2
 var chapter := ChapterState.new()
 var chapter_loaded := false
 var exploration_battle: Dictionary = {}
@@ -112,7 +114,7 @@ func start_exploration() -> void:
 
 func save_chapter() -> bool:
 	# Screenshot fixtures never overwrite the player's real save.
-	if shot in ["explore", "inn", "library", "party"]:
+	if shot != "":
 		return true
 	return chapter.save_to_file() == OK
 
@@ -339,6 +341,10 @@ func _parse_args() -> void:
 			sim_seeds = maxi(1, a.substr(8).to_int())
 		elif a.begins_with("--sim-out="):
 			sim_out = a.substr(10)
+		elif a.begins_with("--stance="):
+			battle_stance = a.substr(9)
+		elif a.begins_with("--sim-party="):
+			sim_party_profile = a.substr(12)
 
 
 func _do_shot() -> void:
@@ -412,10 +418,15 @@ func _do_shot() -> void:
 
 
 func _run_sim() -> void:
+	if not battle_stance in ["", "escort", "sect"] or not sim_party_profile in ["default", "after_b1", "after_b2"]:
+		push_error("模拟参数：--stance=escort|sect；--sim-party=default|after_b1|after_b2")
+		get_tree().quit(2)
+		return
 	var seeds: Array = []
 	for i in sim_seeds:
 		seeds.append(i + 1)
-	var stats := BattleSim.batch(sim, seeds)
+	var stats := BattleSim.batch(sim, seeds, 400, BattleSim.prepared_party(sim_party_profile), battle_stance)
+	stats["party_profile"] = sim_party_profile
 	print(BattleSim.format_summary(stats))
 	if sim_out != "":
 		var path := sim_out if sim_out.is_absolute_path() else ProjectSettings.globalize_path("res://").path_join(sim_out)

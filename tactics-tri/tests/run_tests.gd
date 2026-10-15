@@ -59,6 +59,8 @@ func _run_all() -> void:
 		"test_wuxia_b2_setup_and_mission", "test_chapter_b2_rewards",
 		"test_bamboo_battle_entry_and_return", "test_wuxia_b3_mission_and_variants",
 		"test_chapter_b3_rewards", "test_shrine_battle_entry_and_return",
+		"test_b3_simulation_variants_and_campaign_party",
+		"test_cleared_mission_ai_finishes_objective",
 	]
 	for t in tests:
 		_current = t
@@ -2794,6 +2796,65 @@ func test_b1_autoplay_stats_batch() -> void:
 	check(summary.contains("SIM wuxia_b1") and summary.contains("win_rate="), "summary is machine-readable")
 	# Sanity: default B1 should usually resolve, not hang.
 	check(int(stats["timeouts"]) <= 2, "most default B1 seeds resolve within 300 turns")
+
+
+func test_b3_simulation_variants_and_campaign_party() -> void:
+	var party := BattleSim.prepared_party("after_b1")
+	for id in PartyState.IDS:
+		eq(party.characters[id]["level"], 2, "B1 reward gives each participant level 2")
+		eq(party.characters[id]["exp"], 0, "no B2 experience in the direct-mainline fixture")
+		check(party.characters[id]["training"].is_empty(), "no optional training assumed")
+	eq(party.lesson, 0, "optional inn lesson not assumed")
+	check(not party.characters["sword"]["learned"].has("回锋剑"), "collecting a manual does not auto-learn it")
+	var saved := party.to_dict()
+	for stance in ["escort", "sect"]:
+		# One action is enough to verify the selected state without a slow balance suite.
+		var row := BattleSim.run("wuxia_b3", 3, 1, party, stance)
+		eq(row["stance"], stance, "simulation forwards the requested B3 variant")
+		eq(row["turns"], 1, "unit action count")
+		eq(row["rounds"], 1, "battle rounds counted separately from unit actions")
+		eq(row["allies"][0]["max_hp"], party.stats("sword")["max_hp"], "simulation uses campaign growth")
+		check(not row["objective_taken"] and not row["leader_fallen"], "objective state recorded truthfully")
+		eq(party.to_dict(), saved, "simulation does not alter preparation or grant rewards")
+	var batch := BattleSim.batch("wuxia_b3", [1, 2], 1, party, "sect")
+	eq(batch["stance"], "sect", "batch retains variant metadata")
+	eq(batch["avg_rounds"], 1.0, "batch reports true battle rounds")
+	var b2_party := BattleSim.prepared_party("after_b2")
+	eq(b2_party.characters["sword"]["exp"], 80, "optional profile includes B2 experience")
+	check(BattleSim.prepared_party("default") == null, "default keeps standalone JSON unit loadouts")
+
+
+func test_cleared_mission_ai_finishes_objective() -> void:
+	for battle_id in ["wuxia_b2", "wuxia_b3"]:
+		var s := BattleDefs.build_state(battle_id, 2, BattleSim.prepared_party("after_b1"), "escort")
+		var u: BattleUnit = s.units[0]
+		for other in s.units:
+			if other != u:
+				other.hp = 0
+		u.pos = Vector2i(1, 9) if battle_id == "wuxia_b2" else Vector2i(5, 9)
+		u.hp = 1 # Support scoring used to guard forever after the field was clear.
+		for i in 16:
+			if s.outcome() != "":
+				break
+			s.begin_next_turn()
+			var plan := EnemyAI.plan(s, u)
+			check(plan["move"] != u.pos or plan["skill"] == "__take_chest__", "unopposed low-HP survivor advances objective")
+			if plan["move"] != u.pos:
+				s.move_unit(u, plan["move"])
+			if plan["skill"] == "__take_chest__":
+				s.take_chest(u)
+			s.end_turn()
+		eq(s.outcome(), "win", "clear field reaches pickup / evacuation without idling")
+	# A wall spans farther than this turn's AP. The first step must move away
+	# from the goal; a Manhattan-nearest policy stays in place forever here.
+	var map := BattleMap.flat(9, 9)
+	for y in range(0, 7):
+		map.set_terrain(Vector2i(4, y), "wall")
+	var walker := wuxia_unit(0, BattleUnit.PLAYER, Vector2i(3, 2))
+	walker.ap = 2
+	var state := state_with(map, [walker])
+	var pick := EnemyAI._objective_approach(state, walker, state.reachable_for(walker), [Vector2i(5, 2)])
+	check(pick.y > walker.pos.y, "objective route follows a real detour around a long wall")
 
 
 

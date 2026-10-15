@@ -103,7 +103,9 @@ const KEY_PAN_DELAY_MS := 180
 func _ready() -> void:
 	def = BattleDefs.get_def(Game.current_battle)
 	var explore_party: PartyState = Game.chapter.party if Game.is_exploration_battle() else null
-	var explore_stance := Game.chapter.stance if Game.is_exploration_battle() else ""
+	if not Game.is_exploration_battle() and (Game.shot != "" or Game.autoplay != ""):
+		explore_party = BattleSim.prepared_party(Game.sim_party_profile)
+	var explore_stance := Game.chapter.stance if Game.is_exploration_battle() else Game.battle_stance
 	state = BattleDefs.build_state(Game.current_battle, 7 if Game.shot != "" or Game.autoplay != "" else randi(), explore_party, explore_stance)
 	view = IsoView.new()
 	view.configure(state.map.width, state.map.height)
@@ -112,7 +114,7 @@ func _ready() -> void:
 	_refresh_all()
 	AudioManager.play_bgm("bgm_battle_loop")
 	AudioManager.play_ambience("amb_night_wind")
-	if Game.shot in ["wuxia", "wuxia_b1"]:
+	if Game.shot in ["wuxia", "wuxia_b1", "wuxia_b2", "wuxia_b3"]:
 		state.begin_next_turn()
 		_refresh_all()
 		_set_active(state.current())

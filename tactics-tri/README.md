@@ -37,6 +37,16 @@ godot --headless --path . -- --sim=wuxia_b1 --seeds=24 --sim-out=/tmp/b1_sim.jso
 
 双方 AI 在规则层对打，输出胜率与平均回合；默认种子 1..N。截图模式仍用 `--shot=wuxia`。
 
+B3 两条立场可分别验证；`after_b1` 使用真实 B1 首胜奖励后的 Lv2 队伍，不分配训练、不自动学习或精进，也不发 B2 奖励。`after_b2` 额外包含 B2 的 80 EXP。省略 `--sim-party` 则保留独立演示的 JSON 配置。
+
+```bash
+godot --headless --path . -- --sim=wuxia_b3 --stance=escort --sim-party=after_b1 --seeds=24 --sim-out=/tmp/b3_escort.json
+godot --headless --path . -- --sim=wuxia_b3 --stance=sect --sim-party=after_b1 --seeds=24 --sim-out=/tmp/b3_sect.json
+godot --path . --resolution 1600x900 -- --shot=wuxia_b3 --stance=sect --sim-party=after_b1 --out=/workspace/art-slice/progress/b3_sect.png --frames=20
+```
+
+统计中的 `turns` 是**单位行动次数**，`rounds` 才是全体按速度队列行动一次的**战斗轮次**。B3 胜局还记录 `leader_fallen` 和 `objective_taken`，防止把单纯清场误计为胜利；AI 抽样不等同于真人胜率。
+
 ## 目录
 - `scripts/rules/` 规则与数据；`scripts/game/` 场景与表现；`scenes/` 场景
 - `data/wuxia/` B1 地图与战斗数据；`assets/` 运行时贴图；`audio/`、`fonts/`

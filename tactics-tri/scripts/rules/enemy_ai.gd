@@ -283,6 +283,7 @@ static func _pickup_bias(state: BattleState, u: BattleUnit, reach: Dictionary, b
 	var score := float(best["score"])
 	var ends: Array = reach.get("ends", [u.pos])
 	var cost: Dictionary = reach.get("cost", {})
+	var field_clear := state.living(1 - u.team).is_empty()
 	if not state.chest_taken():
 		var chest: Vector2i = state.mission_chest()
 		var pickup_ap := int(state.mission.get("pickup_ap", 2))
@@ -299,7 +300,7 @@ static func _pickup_bias(state: BattleState, u: BattleUnit, reach: Dictionary, b
 			if u.ap - spent < pickup_ap:
 				# Move adjacent this turn; pick up next action.
 				var approach := 14.0 - float(spent) * 0.2
-				if approach > score and best.get("skill", "") == "":
+				if approach > score and (best.get("skill", "") == "" or field_clear):
 					best = {"score": approach, "move": tile, "skill": "", "target": Vector2i(-1, -1)}
 					score = approach
 				continue
@@ -308,17 +309,13 @@ static func _pickup_bias(state: BattleState, u: BattleUnit, reach: Dictionary, b
 				best = {"score": pick_score, "move": tile, "skill": "__take_chest__", "target": tile}
 				score = pick_score
 		# A wiped field used to idle forever if the chest was more than one move away.
-		if not saw_adjacent and state.living(1 - u.team).is_empty():
-			var best_tile := u.pos
-			var best_d := absi(u.pos.x - chest.x) + absi(u.pos.y - chest.y)
-			for tile in ends:
-				var step := absi(tile.x - chest.x) + absi(tile.y - chest.y)
-				if step < best_d:
-					best_d = step
-					best_tile = tile
-			var chase := 24.0 - float(best_d) * 0.2
-			if best_tile != u.pos and chase > score:
-				best = {"score": chase, "move": best_tile, "skill": "", "target": Vector2i(-1, -1)}
+		if not saw_adjacent and field_clear:
+			var goals := []
+			for d in BattleMap.DIRS:
+				goals.append(chest + d)
+			var next := _objective_approach(state, u, reach, goals)
+			if next != u.pos:
+				best = {"score": 24.0, "move": next, "skill": "", "target": Vector2i(-1, -1)}
 	elif need_exit:
 		var exit_tile: Vector2i = state.mission_exit()
 		if ends.has(exit_tile):
@@ -327,16 +324,28 @@ static func _pickup_bias(state: BattleState, u: BattleUnit, reach: Dictionary, b
 			if evacuate > score:
 				best = {"score": evacuate, "move": exit_tile, "skill": "", "target": Vector2i(-1, -1)}
 		else:
-			# Closest reachable tile toward the exit.
-			var best_tile = best["move"]
-			var best_d := 999
-			for tile in ends:
-				var d := absi(tile.x - exit_tile.x) + absi(tile.y - exit_tile.y)
-				if d < best_d:
-					best_d = d
-					best_tile = tile
-			var chase := 18.0 - float(best_d) * 1.5
-			if chase > score and best.get("skill", "") == "":
-				best = {"score": chase, "move": best_tile, "skill": "", "target": Vector2i(-1, -1)}
+			var next := _objective_approach(state, u, reach, [exit_tile])
+			var chase := 24.0 if field_clear else 18.0 - float(Pathing.manhattan(next, exit_tile)) * 1.5
+			if next != u.pos and (field_clear or (chase > score and best.get("skill", "") == "")):
+				best = {"score": chase, "move": next, "skill": "", "target": Vector2i(-1, -1)}
 	return best
+
+
+## Follow an actual route to the objective, including detours that first move away
+## from it. A nearest-distance greedy step can get trapped behind shrine walls.
+static func _objective_approach(state: BattleState, u: BattleUnit, reach: Dictionary, goals: Array) -> Vector2i:
+	var full := Pathing.search(state.map, u, state.units, 999)
+	var goal := u.pos
+	var cheapest := 1 << 30
+	for tile in goals:
+		if (full["ends"] as Array).has(tile) and int(full["cost"][tile]) < cheapest:
+			goal = tile
+			cheapest = int(full["cost"][tile])
+	var pick := u.pos
+	for tile in Pathing.path_to(full, u.pos, goal):
+		if (reach["ends"] as Array).has(tile):
+			pick = tile
+		else:
+			break
+	return pick
 

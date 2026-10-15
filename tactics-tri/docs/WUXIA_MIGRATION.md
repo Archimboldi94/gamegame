@@ -138,3 +138,10 @@
 - 截图：`docs/20_explore_town.png` … `docs/26_b3_shrine.png`。
 - 测试：`3614 PASS, 0 FAIL`。
 
+
+## 11. 单元 E：B3 平衡与可复现双路线验证（2026-10-15）
+
+- `BattleSim` / CLI 支持立场和真实章节成长基准。`after_b1` 不假设训练、学招、心得或 B2；JSON 同时保存战斗轮次、单位行动次数与目标状态。
+- 固定种子 1..24：护镖 20/24、核验暗记 17/24，均零超时，较调整前双路线 0/24 改善。B3 仅调整敌方原型数值，不改目标和部署。
+- 清场后的目标推进优先于无意义防御，按完整路径绕行，覆盖 B2 取匣／撤离和 B3 取簿；新增低血清场与长墙绕行回归。
+- 测试 3650 PASS / 0 FAIL；抽样 `docs/b3_sim_stats.json`，截图 `/workspace/art-slice/progress/27_b3_escort_balanced.png`、`28_b3_sect_balanced.png`。
