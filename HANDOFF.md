@@ -2,6 +2,8 @@
 
 ## 先看这些
 - 权威设计：`wuxia-tactics/02_当前设计文档/武侠战棋_GDD_v2.0.md`（【已定】必做，【建议】可调）
+- 大地图：`wuxia-tactics/02_当前设计文档/武侠战棋_大地图设计_v1.0.md`
+- 主线剧情与文案：`wuxia-tactics/02_当前设计文档/武侠战棋_主线剧情与文案_v1.0.md`
 - 当前进度与开放问题：`wuxia-tactics/DEV_STATUS.md`
 - 迁移计划：`tactics-tri/docs/WUXIA_MIGRATION.md`
 - 运行/测试/导出：`tactics-tri/README.md`
