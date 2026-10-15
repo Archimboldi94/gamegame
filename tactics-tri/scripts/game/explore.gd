@@ -27,7 +27,8 @@ var nearest := ""
 var font := preload("res://fonts/DroidSansFallbackFull.ttf")
 var tile_tex := {}
 var deco_tree: Texture2D
-var deco_crate: Texture2D
+var prop_tex := {}
+var props_by_cell := {}
 var npc_actors: Array = []
 var autosave_time := 0.0
 var last_saved_position := Vector2.ZERO
@@ -40,6 +41,7 @@ func _ready() -> void:
 	rows = ExplorationRules.grid(area)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_load_explore_art()
+	_load_props()
 	_build_objects()
 	_build_collision()
 	actors = Node2D.new()
@@ -54,8 +56,13 @@ func _ready() -> void:
 		player.sprite.visible = false
 	last_saved_position = player.position
 	camera = Camera2D.new()
-	# Iso diamonds are ~160×80; zoom out so a river bend fits the view.
-	camera.zoom = Vector2.ONE * (0.72 if area == "inn" else 0.48)
+	# Iso diamonds are 160×80. Wide shot fits the whole ferry town; play stays closer.
+	if Game.shot == "explore_wide":
+		camera.zoom = Vector2.ONE * 0.27
+	elif area == "inn":
+		camera.zoom = Vector2.ONE * 0.84
+	else:
+		camera.zoom = Vector2.ONE * 0.56
 	camera.position_smoothing_enabled = false
 	add_child(camera)
 	_update_camera()
@@ -158,7 +165,20 @@ func _load_explore_art() -> void:
 		if ResourceLoader.exists(sidetop):
 			tile_tex["sidetop_%s" % art] = load(sidetop)
 	deco_tree = load("res://assets/tiles/deco_tree.png") if ResourceLoader.exists("res://assets/tiles/deco_tree.png") else null
-	deco_crate = load("res://assets/tiles/deco_rubble.png") if ResourceLoader.exists("res://assets/tiles/deco_rubble.png") else null
+
+
+func _load_props() -> void:
+	props_by_cell.clear()
+	for prop in ExploreDressing.props(area):
+		var kind := String(prop.get("kind", ""))
+		if not prop_tex.has(kind):
+			var path := String(ExploreDressing.TEXTURES.get(kind, ""))
+			prop_tex[kind] = load(path) if path != "" and ResourceLoader.exists(path) else null
+		var cell_raw: Array = prop.get("cell", [0, 0])
+		var cell := Vector2i(int(cell_raw[0]), int(cell_raw[1]))
+		if not props_by_cell.has(cell):
+			props_by_cell[cell] = []
+		(props_by_cell[cell] as Array).append(kind)
 
 
 func _build_npcs() -> void:
@@ -314,10 +334,13 @@ func interact(object_id: String) -> bool:
 			else:
 				_show_dialogue("竹林遗匣 · 战前确认", "竹影深处有一只封漆旧匣，有人守着不肯离开。\n目标：相邻格花费 2AP 取匣，再至少一人抵达撤离点。\n出战：剑客、枪客、拳师。可选支线，不完成也能去废祠。", "确认出战", _start_bamboo_battle)
 		"shrine_event":
-			if not Game.chapter.can_event("shrine_battle_start"):
+			if Game.chapter.b3_clear:
+				_show_dialogue("废祠 · 回访", "渡簿已经取回。祠中只剩残碑，不再开战。")
+			elif not Game.chapter.can_event("shrine_battle_start"):
 				_show_dialogue(target["name"] + " · 线索不足", "此处有旧日车辙，却还不能确认来历。\n先调查渡口，再回客栈听取两派解释并选择立场。")
 			else:
-				_show_dialogue(target["name"] + " · 后续开放", "线索已经明确。可直接追查废祠渡簿，无需先去竹林。\n此处战斗后续开放。")
+				var variant := "守约护箱：西侧会停一辆挡住通路的货车。" if Game.chapter.stance == "escort" else "核验暗记：从东侧部署，门口那处陷阱已被排除。"
+				_show_dialogue("废祠夺簿 · 战前确认", "祠中残党守着渡簿。须先击败首领，再在相邻格花费 2AP 取回。\n无需先去竹林。\n" + variant + "\n出战：剑客、枪客、拳师。", "确认出战", _start_shrine_battle)
 	return true
 
 
@@ -331,7 +354,7 @@ func _stance_dialogue(id: String) -> void:
 		_show_dialogue(speaker, text + "\n你的立场已经确定：" + ("守约护箱（白鹭镖局）。" if Game.chapter.stance == "escort" else "核验暗记（青岚门）。") + "此事不再改选。")
 	else:
 		text += "\n\n选择后仅能确定一次。\n" + ("守约护箱：镖局关系 +1；废祠将有可利用的货车。" if escort else "核验暗记：青岚门关系 +1；废祠可从侧翼部署，并预先排除一处陷阱。")
-		_show_dialogue(speaker, text, "确认：守约护箱" if escort else "确认：核验暗记", _commit_dialogue.bind("choose_escort" if escort else "choose_sect", "立场已确定。可前往废祠门口追查渡簿，或先去竹林《遗匣》可选关卡。\nB3 废祠战斗后续开放。"))
+		_show_dialogue(speaker, text, "确认：守约护箱" if escort else "确认：核验暗记", _commit_dialogue.bind("choose_escort" if escort else "choose_sect", "立场已确定。可前往废祠门口追查渡簿，或先去竹林《遗匣》。废祠不要求先完成竹林。"))
 
 
 func _commit_dialogue(event_id: String, message: String) -> void:
@@ -353,6 +376,12 @@ func _start_bamboo_battle() -> void:
 	_sync_position()
 	if not Game.begin_bamboo_battle(player.position):
 		_show_dialogue("竹林", "条件已变化或存档未能写入，请重新调查。")
+
+
+func _start_shrine_battle() -> void:
+	_sync_position()
+	if not Game.begin_shrine_battle(player.position):
+		_show_dialogue("废祠", "条件已变化或存档未能写入，请重新调查。")
 
 
 func _transfer(destination: String) -> void:
@@ -517,7 +546,8 @@ func _show_journal() -> void:
 	text += "队伍谱库 %d 门 · 武学心得 %d\n" % [s.party.library.size(), s.party.lesson]
 	text += "Esc 打开队伍成长；客栈谱库可免费学习与装配。\n"
 	text += ("竹林遗匣：已取匣" if s.b2_clear else "竹林遗匣：可选支线") + "  ·  废祠不要求先完成竹林\n"
-	text += "B3 废祠战斗后续开放。"
+	text += ("废祠：渡簿已入手" if s.b3_clear else "废祠：选定立场后可进入") + "\n"
+	text += "物品：" + ("、".join(s.unlocked_manuals) if not s.unlocked_manuals.is_empty() else "无")
 	_show_dialogue("任务日志 [Tab]", text)
 
 
@@ -567,22 +597,20 @@ func _draw() -> void:
 	cells.sort_custom(func(a, b): return (a.x + a.y) < (b.x + b.y))
 	for cell in cells:
 		_draw_iso_tile(cell, rows[cell.y][cell.x])
+	_draw_landmarks()
 	if area == "outdoor":
-		_draw_iso_building(Vector2i(4, 18), Vector2i(9, 4), "听雨客栈", Vector2i(8, 21))
-		_draw_iso_building(Vector2i(32, 3), Vector2i(9, 6), "废祠", Vector2i(37, 8))
 		_draw_iso_sign(Vector2i(15, 21), "渡口 →")
-		_draw_iso_sign(Vector2i(20, 12), "竹林 ↑")
-		_draw_iso_sign(Vector2i(33, 14), "废祠 ↑")
-		_draw_ferry_boat()
-		_draw_outdoor_props()
+		_draw_iso_sign(Vector2i(18, 14), "竹林 ↑")
+		_draw_iso_sign(Vector2i(30, 14), "废祠 ↑")
 	else:
-		_draw_iso_inn_furniture()
+		var title_iso := ExploreIso.cell_to_iso(Vector2i(6, 1))
+		draw_string(font, title_iso + Vector2(-110, -70), "听 雨 客 栈", HORIZONTAL_ALIGNMENT_CENTER, 220, 28, UIKit.GOLD)
 	for obj in objects:
 		var iso := ExploreIso.world_to_iso(obj["position"])
 		var selected: bool = obj["id"] == nearest
 		var col := UIKit.GOLD if selected else Color(0.84, 0.76, 0.51, 0.55)
 		_draw_iso_marker(iso, col)
-		if not obj.has("cls") and obj["id"] not in ["inn_door", "shrine_event"]:
+		if not obj.has("cls"):
 			draw_string(font, iso + Vector2(-70, -56), obj["name"], HORIZONTAL_ALIGNMENT_CENTER, 140, 20, UIKit.IVORY)
 	# Player sprite in IsoView space (collision body stays in design-space).
 	if is_instance_valid(player):
@@ -596,9 +624,13 @@ func _tex(key: String) -> Texture2D:
 func _draw_iso_tile(cell: Vector2i, ch: String) -> void:
 	var art := ExploreIso.art_for(ch)
 	var h := ExploreIso.height_for(ch)
-	# Dock boards near water use bridge art.
+	# Dock boards near the river use the battle bridge diamond.
 	if ch == "=" and area == "outdoor" and cell.x >= 34:
 		art = "bridge"
+	# Outdoor houses sit on a flat stone court. The readable hall is a prop, not stacked wall diamonds.
+	if ch == "H" and area == "outdoor":
+		art = "stone"
+		h = 0
 	var origin := ExploreIso.cell_to_iso(cell, h)
 	var tw := ExploreIso.TW
 	var th := ExploreIso.TH
@@ -625,45 +657,36 @@ func _draw_iso_tile(cell: Vector2i, ch: String) -> void:
 	if top:
 		draw_texture(top, origin + Vector2(-tw * 0.5, -th * 0.5))
 	if ch == "#":
-		if deco_tree:
-			draw_texture(deco_tree, origin + Vector2(-36, -110))
+		var kinds: Array = props_by_cell.get(cell, [])
+		if kinds.has("bamboo"):
+			_draw_prop(cell, "bamboo")
+		elif deco_tree:
+			# Same forest filler the battle map uses.
+			draw_texture(deco_tree, origin + Vector2(-40, -78))
+			draw_texture(deco_tree, origin + Vector2(8, -90))
 		else:
 			draw_circle(origin + Vector2(0, -30), 22, Color("203d36"))
-			draw_circle(origin + Vector2(-6, -48), 18, Color("355745"))
-	elif ch == "H" and area == "outdoor":
-		pass
-	elif ch == "," and deco_crate and posmod(cell.x + cell.y * 3, 11) == 0:
-		draw_texture(deco_crate, origin + Vector2(-20, -28))
 
 
-func _draw_iso_building(origin_cell: Vector2i, size: Vector2i, title: String, door: Vector2i) -> void:
-	var base := ExploreIso.cell_to_iso(origin_cell + Vector2i(size.x / 2, size.y / 2), 2)
-	var tw := ExploreIso.TW
-	var th := ExploreIso.TH
-	# Floor stone inside, raised wall ring, stone roof diamonds.
-	for dy in size.y:
-		for dx in size.x:
-			var cell := origin_cell + Vector2i(dx, dy)
-			var edge := dx == 0 or dy == 0 or dx == size.x - 1 or dy == size.y - 1
-			var h := 2 if edge else 1
-			var o := ExploreIso.cell_to_iso(cell, h)
-			var art := "wall" if edge else "stone"
-			var side: Texture2D = _tex("side_%s" % ("wall" if edge else "stone"))
-			if side:
-				for i in range(h, 0, -1):
-					draw_texture(side, o + Vector2(-tw * 0.5, i * ExploreIso.HS))
-			var top: Texture2D = _tex("%s_%d" % [art, posmod(dx + dy, 4)])
-			if top:
-				draw_texture(top, o + Vector2(-tw * 0.5, -th * 0.5))
-	# Dark roof ridge across the long axis.
-	var roof_a := ExploreIso.cell_to_iso(origin_cell + Vector2i(1, 0), 3)
-	var roof_b := ExploreIso.cell_to_iso(origin_cell + Vector2i(size.x - 2, 0), 3)
-	draw_line(roof_a + Vector2(0, -th), roof_b + Vector2(0, -th), Color("2a3a3c"), 6)
-	var door_iso := ExploreIso.world_to_iso(ExplorationRules.center(door))
-	draw_colored_polygon(PackedVector2Array([
-		door_iso + Vector2(0, -18), door_iso + Vector2(22, 0), door_iso + Vector2(0, 18), door_iso + Vector2(-22, 0)
-	]), Color("1c2c2a"))
-	draw_string(font, base + Vector2(-90, -150), title, HORIZONTAL_ALIGNMENT_CENTER, 180, 26, UIKit.GOLD)
+func _draw_prop(cell: Vector2i, kind: String) -> void:
+	var tex: Texture2D = prop_tex.get(kind)
+	if tex == null:
+		return
+	var origin := ExploreIso.cell_to_iso(cell)
+	var size := tex.get_size()
+	draw_texture(tex, origin - Vector2(size.x * 0.5, size.y - 8.0))
+
+
+func _draw_landmarks() -> void:
+	var marks: Array[Vector2i] = []
+	for cell in props_by_cell.keys():
+		marks.append(cell)
+	marks.sort_custom(func(a, b): return (a.x + a.y) < (b.x + b.y))
+	for cell in marks:
+		for kind in props_by_cell[cell]:
+			if kind in ExploreDressing.GROUND_DECO:
+				continue
+			_draw_prop(cell, String(kind))
 
 
 func _draw_iso_sign(cell: Vector2i, text: String) -> void:
@@ -671,43 +694,6 @@ func _draw_iso_sign(cell: Vector2i, text: String) -> void:
 	draw_line(o + Vector2(0, -8), o + Vector2(0, 18), Color("514a34"), 4)
 	draw_rect(Rect2(o + Vector2(-70, -40), Vector2(140, 28)), Color("33453d"))
 	draw_string(font, o + Vector2(-68, -18), text, HORIZONTAL_ALIGNMENT_CENTER, 136, 18, UIKit.GOLD)
-
-
-func _draw_ferry_boat() -> void:
-	var o := ExploreIso.cell_to_iso(Vector2i(44, 23))
-	draw_colored_polygon(PackedVector2Array([
-		o + Vector2(-50, 0), o + Vector2(-10, -18), o + Vector2(55, -6), o + Vector2(40, 16), o + Vector2(-30, 14)
-	]), Color("725a3d"))
-	draw_line(o + Vector2(-40, 0), ExploreIso.cell_to_iso(Vector2i(42, 23)), UIKit.GOLD, 3)
-
-
-func _draw_outdoor_props() -> void:
-	# Cargo crates at the ferry and shrine path markers.
-	for cell in [Vector2i(35, 22), Vector2i(36, 21), Vector2i(38, 24), Vector2i(34, 10), Vector2i(17, 8)]:
-		var o := ExploreIso.cell_to_iso(cell)
-		if deco_crate:
-			draw_texture(deco_crate, o + Vector2(-22, -30))
-		else:
-			draw_rect(Rect2(o + Vector2(-16, -12), Vector2(32, 20)), Color("8a7050"))
-
-
-func _draw_iso_inn_furniture() -> void:
-	var title_iso := ExploreIso.cell_to_iso(Vector2i(7, 1))
-	draw_string(font, title_iso + Vector2(-100, -40), "听 雨 客 栈", HORIZONTAL_ALIGNMENT_CENTER, 200, 28, UIKit.GOLD)
-	var desk := ExploreIso.world_to_iso(ExplorationRules.center(ExplorationRules.INN_POINTS["keeper"]))
-	draw_rect(Rect2(desk + Vector2(-50, -8), Vector2(100, 26)), Color("473e32"))
-	draw_rect(Rect2(desk + Vector2(-50, -16), Vector2(100, 18)), Color("a08558"))
-	var library := ExploreIso.world_to_iso(ExplorationRules.center(ExplorationRules.INN_POINTS["codex"]))
-	draw_rect(Rect2(library + Vector2(-30, -18), Vector2(60, 34)), Color("423c32"))
-	for i in 6:
-		draw_rect(Rect2(library + Vector2(-24 + i * 8, -14), Vector2(6, 24)), Color("9aab9a") if i % 2 else Color("bb9d6a"))
-	var training := ExploreIso.world_to_iso(ExplorationRules.center(ExplorationRules.INN_POINTS["training"]))
-	draw_circle(training, 26, Color("414a41"))
-	draw_line(training + Vector2(0, -36), training + Vector2(0, 12), Color("b2935d"), 8)
-	var exit_pos := ExploreIso.world_to_iso(ExplorationRules.center(ExplorationRules.INN_POINTS["exit"]))
-	draw_colored_polygon(PackedVector2Array([
-		exit_pos + Vector2(0, -20), exit_pos + Vector2(26, 0), exit_pos + Vector2(0, 20), exit_pos + Vector2(-26, 0)
-	]), Color("aea080"))
 
 
 func _draw_iso_marker(iso: Vector2, col: Color) -> void:

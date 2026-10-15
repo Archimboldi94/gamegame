@@ -34,10 +34,12 @@ static func grid(area: String) -> Array[String]:
 	var blueprint: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/wuxia/qingyadu_blueprint_v1.3.json"))
 	var rows: Array[String] = []
 	rows.assign(blueprint["scenes"][area]["terrain_grid"])
-	# Blueprint R is drawn one column left of its coordinate table. The GDD table wins.
+	# Open a door drawn as a wall. Roads, wood floors and banks keep their tile.
 	var points: Dictionary = OUTDOOR_POINTS if area == "outdoor" else INN_POINTS
+	var floor := "w" if area == "inn" else "."
 	for point: Vector2i in points.values():
-		rows[point.y] = rows[point.y].substr(0, point.x) + "." + rows[point.y].substr(point.x + 1)
+		if is_blocked(rows, point):
+			rows[point.y] = rows[point.y].substr(0, point.x) + floor + rows[point.y].substr(point.x + 1)
 	return rows
 
 
