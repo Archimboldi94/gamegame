@@ -1,5 +1,5 @@
 {
-  "status": "B1原型建议参数；不代表最终定案",
+  "status": "B1平衡参数 v7：3v2 双方AI目标胜率约40–70%；不代表最终定案",
   "skills": {
     "普攻": {
       "ap": 3,
@@ -191,19 +191,19 @@
         0,
         1
       ],
-      "hp": 25,
-      "max_hp": 25,
-      "strength": 3,
-      "armor": 2,
-      "accuracy": 0,
-      "evasion": 10,
-      "speed": 76,
-      "qi": 8,
+      "hp": 38,
+      "max_hp": 38,
+      "strength": 6,
+      "armor": 3,
+      "accuracy": 5,
+      "evasion": 8,
+      "speed": 82,
+      "qi": 12,
       "skills": [
         "横江刀"
       ],
       "marker": "1",
-      "inner": "",
+      "inner": "苍松功",
       "lightfoot": "燕行步",
       "weapon": "blade"
     },
@@ -215,19 +215,20 @@
         -1,
         1
       ],
-      "hp": 26,
-      "max_hp": 26,
-      "strength": 3,
-      "armor": 3,
-      "accuracy": 0,
-      "evasion": 7,
-      "speed": 45,
-      "qi": 8,
+      "hp": 36,
+      "max_hp": 36,
+      "strength": 5,
+      "armor": 4,
+      "accuracy": 4,
+      "evasion": 6,
+      "speed": 58,
+      "qi": 12,
       "skills": [
-        "震山掌"
+        "震山掌",
+        "截脉指"
       ],
       "marker": "2",
-      "inner": "",
+      "inner": "归元诀",
       "lightfoot": "踏雪步",
       "weapon": "fist"
     }

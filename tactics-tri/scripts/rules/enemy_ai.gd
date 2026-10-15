@@ -16,9 +16,14 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 	var holding := u.ai == "hold" and _nearest_dist(u.pos, foes, u.use_gdd_rules) > HOLD_RADIUS
 	var candidates: Array = [u.pos] if holding else ends
 	var caution := (8.0 if u.is_lord else 1.5) * (2.0 - float(u.hp) / float(u.max_hp))
+	var risk_weight := 1.25
+	if foes.size() <= 1:
+		risk_weight = 0.55  # finish the last foe instead of forever kiting
+	elif float(u.hp) >= float(u.max_hp) * 0.7 and foes.size() <= 2:
+		risk_weight = 0.9
 	for tile in candidates:
 		var risk := path_risk(state, u, tile, reach)
-		var tile_bonus: float = state.map.get_h(tile) * 0.3 - threat_count(state, u, tile) * caution - risk * 1.25
+		var tile_bonus: float = state.map.get_h(tile) * 0.3 - threat_count(state, u, tile) * caution - risk * risk_weight
 		if state.map.effect_at(tile) == "fire":
 			tile_bonus -= 8.0
 		for sid in u.all_actions():
@@ -54,26 +59,42 @@ static func plan(state: BattleState, u: BattleUnit) -> Dictionary:
 static func _gdd_support(state: BattleState, u: BattleUnit, reach: Dictionary, best: Dictionary, foes: Array, holding: bool) -> Dictionary:
 	var score := float(best["score"])
 	var current_dist := _nearest_dist(u.pos, foes, true) if not foes.is_empty() else 999
-	# Immune lightfoot when it closes distance and a walk-in attack is not already planned.
+	# Lightfoot when it closes distance and a walk-in attack is not already planned.
+	# 燕行步 is ZoC-immune; 踏雪步 pays normal opportunity risk but lands with 护势.
 	if (best["skill"] == "" or score < 6.0) and not holding and not foes.is_empty():
 		for sid in u.all_actions():
 			var sk := SkillDB.get_skill(sid)
-			if sk["shape"] != "leap" or not bool(sk.get("opportunity_immune", false)):
+			if sk["shape"] != "leap":
 				continue
 			if not state.skill_usable(u, sid):
 				continue
+			var immune := bool(sk.get("opportunity_immune", false))
 			for tile in state.target_tiles(u, sid, u.pos):
 				var leap_dist := _nearest_dist(tile, foes, true)
 				if leap_dist >= current_dist:
 					continue
+				var path := Pathing.path_to(state.lightfoot_reach(u, sk, u.pos), u.pos, tile)
+				var risk := 0.0
+				if not immune:
+					for e in state.path_reactions(u, path):
+						risk += float(e["dmg"]) * float(e["hit"]) / 100.0
+					# Skip suicidal 踏雪步; allow mild risk when closing in or landing with 护势.
+					if risk >= float(u.hp) * 0.45:
+						continue
 				var leap_score := 5.5 + float(current_dist - leap_dist) * 3.5
 				if leap_dist > 1:
 					leap_score += 1.0 # still better than idling far away
+				if not immune:
+					leap_score -= risk * 0.35
+					if bool(sk.get("landing_guard", false)):
+						leap_score += 1.2
 				if leap_score > score:
 					best = {"score": leap_score, "move": u.pos, "skill": sid, "target": tile}
 					score = leap_score
 	# Rest / guard from the current tile so approach does not spend the AP first.
-	if score < 12.0:
+	# Do not turtle forever when we already outnumber a wounded last foe.
+	var finish := foes.size() <= 1 and (foes.is_empty() or float(foes[0].hp) <= float(foes[0].max_hp) * 0.55)
+	if score < 12.0 and not finish:
 		var threatened := threat_count(state, u, u.pos) > 0 or current_dist <= 2
 		var low_hp := float(u.hp) <= float(u.max_hp) * 0.45
 		var need_qi := u.qi <= u.max_qi - 4

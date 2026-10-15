@@ -2661,7 +2661,7 @@ func test_party_exploration_loadout() -> void:
 	eq([u.max_ap, u.ap, u.rp], [6, 6, 1], "progression preserves AP and RP")
 	for i in 3:
 		eq(battle.state.units[i].innate_trait, PartyState.TRAITS[PartyState.IDS[i]], "B1 character has its fixed trait")
-	eq(battle.state.units[3].max_hp, 25, "enemy data remains unchanged")
+	eq(battle.state.units[3].max_hp, 38, "enemy data remains balanced B1 values")
 	battle.free()
 	game.exploration_battle.clear()
 	battle = load("res://scenes/battle.tscn").instantiate()
