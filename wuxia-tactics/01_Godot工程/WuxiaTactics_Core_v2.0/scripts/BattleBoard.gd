@@ -4,6 +4,7 @@ const DIRECTIONS: Array[Vector2i] = [Vector2i(-1,-1), Vector2i(0,-1), Vector2i(1
 var cells: Array[String] = []
 var width: int = 0
 var height: int = 0
+var markers: Dictionary = {}
 
 func load_from(path: String) -> bool:
     var file: FileAccess = FileAccess.open(path, FileAccess.READ)
@@ -16,10 +17,11 @@ func load_from(path: String) -> bool:
         return false
     width = int(raw.get("width", 0))
     height = int(raw.get("height", 0))
+    markers = raw.get("markers", {}).duplicate(true)
     cells.clear()
     for line in raw.get("terrain_grid", []):
         cells.append(str(line))
-    if cells.size() != height:
+    if width <= 0 or height <= 0 or cells.size() != height:
         push_error("Map height mismatch")
         return false
     for row in cells:
@@ -60,7 +62,13 @@ func can_step(at: Vector2i, nxt: Vector2i, units: Array[Dictionary], ignore_id: 
             return false
     return true
 
-func path(start: Vector2i, goal: Vector2i, units: Array[Dictionary], ignore_id: int = -1) -> Array[Vector2i]:
+func melee_clear(at: Vector2i, target: Vector2i) -> bool:
+    if solid(at) or solid(target) or chebyshev(at,target) != 1:
+        return false
+    var d: Vector2i = target-at
+    return d.x == 0 or d.y == 0 or not (solid(at+Vector2i(d.x,0)) and solid(at+Vector2i(0,d.y)))
+
+func path(start: Vector2i, goal: Vector2i, units: Array[Dictionary], ignore_id: int = -1, penalty: Callable = Callable()) -> Array[Vector2i]:
     var empty: Array[Vector2i] = []
     if start == goal or solid(goal) or occupied(goal, units, ignore_id):
         return empty
@@ -81,6 +89,8 @@ func path(start: Vector2i, goal: Vector2i, units: Array[Dictionary], ignore_id: 
             if not can_step(cur,nxt,units,ignore_id):
                 continue
             var candidate: int = int(dist[cur])+travel_cost(nxt)
+            if penalty.is_valid():
+                candidate += maxi(0,int(penalty.call(cur,nxt)))
             if not dist.has(nxt) or candidate < int(dist[nxt]):
                 dist[nxt] = candidate
                 previous[nxt] = cur
@@ -102,19 +112,38 @@ func path_ap(route: Array[Vector2i]) -> int:
     return total
 
 func leap_allowed(start: Vector2i, goal: Vector2i, units: Array[Dictionary], ignore_id: int) -> bool:
-    if solid(goal) or occupied(goal,units,ignore_id):
+    if solid(start) or solid(goal) or occupied(goal,units,ignore_id):
         return false
     var d: Vector2i = goal-start
     var steps: int = maxi(absi(d.x),absi(d.y))
     if steps < 1 or steps > 3:
         return false
-    # Only short walls/low obstacles can be cleared; no phasing through solid buildings or crates.
-    for i in range(1,steps):
-        var t: float = float(i)/float(steps)
-        var p: Vector2i = Vector2i(roundi(float(start.x)+float(d.x)*t),roundi(float(start.y)+float(d.y)*t))
-        if tile(p) in ["#","H","C"]:
+    # Traverse every cell intersected by the segment, including off-axis short leaps.
+    # At an exact corner use the same sealed-corner rule as ordinary movement.
+    var cursor: Vector2i = start
+    var sx: int = signi(d.x)
+    var sy: int = signi(d.y)
+    var tx: float = 0.5/absf(d.x) if d.x != 0 else INF
+    var ty: float = 0.5/absf(d.y) if d.y != 0 else INF
+    while cursor != goal:
+        if is_equal_approx(tx,ty):
+            if leap_blocker(cursor+Vector2i(sx,0)) and leap_blocker(cursor+Vector2i(0,sy)):
+                return false
+            cursor += Vector2i(sx,sy)
+            tx += 1.0/absf(d.x)
+            ty += 1.0/absf(d.y)
+        elif tx < ty:
+            cursor.x += sx
+            tx += 1.0/absf(d.x)
+        else:
+            cursor.y += sy
+            ty += 1.0/absf(d.y)
+        if leap_blocker(cursor):
             return false
     return true
+
+func leap_blocker(p: Vector2i) -> bool:
+    return tile(p) in ["#","H","C"]
 
 func chebyshev(a: Vector2i, b: Vector2i) -> int:
     return maxi(absi(a.x-b.x),absi(a.y-b.y))
@@ -130,8 +159,10 @@ func line_clear(a: Vector2i, b: Vector2i) -> bool:
     var d: Vector2i = b-a
     var step: Vector2i = Vector2i(signi(d.x),signi(d.y))
     var cursor: Vector2i = a+step
+    var previous: Vector2i = a
     while cursor != b:
-        if solid(cursor):
+        if not melee_clear(previous,cursor):
             return false
+        previous = cursor
         cursor += step
-    return not solid(b)
+    return melee_clear(previous,b)

@@ -4,7 +4,7 @@ const Board = preload("res://scripts/BattleBoard.gd")
 ## Each enemy uses exactly the same movement, hit, armor, ZOC and reaction APIs as the player.
 
 func play(state) -> void:
-    if state.result != "":
+    if state.result != "" or state.active_id() < 0:
         return
     var eid: int = state.active_id()
     if str(state.units[eid]["side"]) != "enemy":
@@ -26,18 +26,39 @@ func play(state) -> void:
             break
         var best_route: Array[Vector2i] = []
         var best_cost: int = 99999
+        var best_score: float = INF
         for aid in state.living_enemy_of("enemy"):
             var player: Dictionary = state.units[aid]
             var center: Vector2i = player["pos"]
             for d in Board.DIRECTIONS:
                 var goal: Vector2i = center+d
-                if state.board.solid(goal) or state.board.occupied(goal,state.units,eid):
+                if not state.board.melee_clear(goal,center) or state.board.occupied(goal,state.units,eid):
                     continue
-                var route: Array[Vector2i] = state.board.path(state.units[eid]["pos"],goal,state.units,eid)
+                # Cost includes current opportunity damage. Never invent a second resolver.
+                var penalty: Callable = func(at: Vector2i, nxt: Vector2i) -> int:
+                    var danger: Array[int] = state.opportunity_sources(eid,at,nxt)
+                    if danger.is_empty():
+                        return 0
+                    var source: int = danger[0]
+                    return ceili(float(state.expected_damage(source,eid,"普攻"))*float(state.hit_chance(source,eid,"普攻",true))/100.0)
+                var route: Array[Vector2i] = state.board.path(state.units[eid]["pos"],goal,state.units,eid,penalty)
                 if route.is_empty():
                     continue
                 var cost: int = state.board.path_ap(route)
-                if cost < best_cost:
+                var risk_cost: float = 0.0
+                # The full route can exceed this turn's AP; evaluate its executable prefix.
+                var sample: Array[Vector2i] = []
+                var sample_ap: int = 0
+                for p in route:
+                    sample_ap += state.board.travel_cost(p)
+                    if sample_ap > int(state.units[eid]["ap"]):
+                        break
+                    sample.append(p)
+                for risk in state.movement_preview(eid,sample)["risks"]:
+                    risk_cost += float(risk["chance"])*float(risk["max_damage"])/100.0
+                var score: float = float(cost)+risk_cost
+                if score < best_score:
+                    best_score = score
                     best_cost = cost
                     best_route = route
         if best_route.is_empty():

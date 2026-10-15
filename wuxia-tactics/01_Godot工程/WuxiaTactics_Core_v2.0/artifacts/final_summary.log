@@ -1,0 +1,6 @@
+static: PASS; exit=0; log=artifacts/final_static.log
+editor: PASS; exit=0; log=artifacts/final_editor.log
+import: PASS; exit=0; log=artifacts/final_import.log
+combat: PASS; exit=0; log=artifacts/final_combat.log
+ui: PASS; exit=0; log=artifacts/final_ui.log
+main: PASS; exit=0; log=artifacts/final_main.log

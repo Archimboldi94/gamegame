@@ -1,0 +1,16 @@
+ERROR: Failed to open 'user://logs/godot2026-10-15T10.46.56.log'.
+   at: copy (core/io/dir_access.cpp:423)
+
+================================================================
+handle_crash: Program crashed with signal 11
+Engine version: Godot Engine v4.6.3.stable.official (7d41c59c457bd5a245092b4e7eb2d833e3b3f8c3)
+Dumping the backtrace. Please include this when reporting the bug on: https://github.com/godotengine/godot/issues
+[1] /lib/x86_64-linux-gnu/libc.so.6(+0x3fd70) [0x7f61b07cad70] (??:0)
+[2] /home/box/.local/bin/godot() [0x43f3acf] (??:0)
+[3] /home/box/.local/bin/godot() [0x4c46eca] (??:0)
+[4] /home/box/.local/bin/godot() [0x431ffa] (??:0)
+[5] /lib/x86_64-linux-gnu/libc.so.6(+0x29ca8) [0x7f61b07b4ca8] (??:0)
+[6] /lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x85) [0x7f61b07b4d65] (??:0)
+[7] /home/box/.local/bin/godot() [0x48b13a] (??:0)
+-- END OF C++ BACKTRACE --
+================================================================

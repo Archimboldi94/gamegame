@@ -17,6 +17,8 @@ var chosen: String = "移动"
 var hovered: Vector2i = Vector2i(-99,-99)
 var hovered_route: Array[Vector2i] = []
 var pending_route: Array[Vector2i] = []
+var pending_actor: int = -1
+var pending_generation: int = -1
 var turn_text: Label
 var status_text: Label
 var info_text: Label
@@ -42,6 +44,9 @@ func _new_battle() -> void:
     battle_generation += 1
     enemy_busy = false
     finished_popup_shown = false
+    confirm_move.hide()
+    finished_dialog.hide()
+    _clear_pending()
     battle.reset()
     chosen = "移动"
     hovered = Vector2i(-99,-99)
@@ -100,6 +105,7 @@ func _create_ui() -> void:
     for key in ["移动","普攻","武学1","武学2","武学3","燕行步","防御","调息","结束行动","日志","重开"]:
         var btn := Button.new()
         btn.text = key
+        btn.focus_mode = Control.FOCUS_NONE
         btn.custom_minimum_size = Vector2(93.0,39.0)
         if key == "结束行动":
             btn.custom_minimum_size.x = 128.0
@@ -128,9 +134,14 @@ func _create_ui() -> void:
     logs_panel.size = Vector2(305,275)
     logs_panel.add_theme_stylebox_override("panel",_panel_style(Color("#172630ef"),Color("#728e85")))
     add_child(logs_panel)
+    var log_scroll := ScrollContainer.new()
+    log_scroll.custom_minimum_size = Vector2(285,255)
+    logs_panel.add_child(log_scroll)
     logs_text = _label("",14,Color("#ece3d1"))
+    logs_text.custom_minimum_size.x = 265
+    logs_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     logs_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    logs_panel.add_child(logs_text)
+    log_scroll.add_child(logs_text)
     logs_panel.hide()
 
     confirm_move = ConfirmationDialog.new()
@@ -139,6 +150,8 @@ func _create_ui() -> void:
     confirm_move.dialog_text = "这段路径可能遭到借机攻击，是否继续？"
     add_child(confirm_move)
     confirm_move.confirmed.connect(_commit_pending_move)
+    confirm_move.canceled.connect(_cancel)
+    confirm_move.close_requested.connect(_cancel)
 
     finished_dialog = AcceptDialog.new()
     finished_dialog.title = "战斗结果"
@@ -148,7 +161,8 @@ func _create_ui() -> void:
 func _resolve_button(key: String) -> String:
     if key == "武学1" or key == "武学2" or key == "武学3":
         var idx: int = int(key.right(1))-1
-        return str(battle.active()["skills"][idx])
+        var equipped: Array = battle.active().get("skills",[])
+        return str(equipped[idx]) if idx < equipped.size() else ""
     return key
 
 func _on_button(key: String) -> void:
@@ -163,8 +177,8 @@ func _on_button(key: String) -> void:
         return
     _choose(key)
 
-func _input(event: InputEvent) -> void:
-    if enemy_busy or battle.result != "" or battle.active()["side"] != "player":
+func _unhandled_input(event: InputEvent) -> void:
+    if not _active_usable():
         return
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
@@ -189,21 +203,19 @@ func _input(event: InputEvent) -> void:
             _click_cell(_pixel_cell(event.position))
 
 func _process(_delta: float) -> void:
-    if enemy_busy or battle.result != "" or battle.active()["side"] != "player":
+    if not _active_usable():
         return
     var m: Vector2 = get_viewport().get_mouse_position()
     if m.y <= 90 or m.y >= 556:
         return
     if logs_panel.visible and Rect2(logs_panel.position,logs_panel.size).has_point(m):
         return
-    if m.x >= 948 and m.y < 365:
-        return
     var cell: Vector2i = _pixel_cell(m)
     if cell != hovered:
         _update_hover(cell)
 
 func _active_usable() -> bool:
-    return not enemy_busy and battle.result == "" and battle.active()["side"] == "player"
+    return not enemy_busy and battle.result == "" and not battle.active().is_empty() and battle.active()["side"] == "player" and not confirm_move.visible
 
 func _refresh() -> void:
     if battle.units.is_empty():
@@ -224,7 +236,7 @@ func _refresh() -> void:
     for key in buttons:
         var btn: Button = buttons[key]
         var name: String = _resolve_button(key) if key in ["武学1","武学2","武学3"] else str(key)
-        btn.text = "%s %s" % [key,name] if key.begins_with("武学") else name
+        btn.text = "%s %s" % [key,name if name != "" else "—"] if key.begins_with("武学") else name
         if key in ["日志","重开"]:
             btn.disabled = false
             continue
@@ -241,7 +253,7 @@ func _check_finished() -> void:
     if battle.result == "" or finished_popup_shown:
         return
     finished_popup_shown = true
-    finished_dialog.dialog_text = "胜利！两名劫客被击败。" if battle.result == "victory" else "失败：三名队员全部倒下。"
+    finished_dialog.dialog_text = "胜利！两名劫客被击败。" if battle.result == "victory" else ("关卡数据加载失败，请查看日志。" if battle.result == "error" else "失败：三名队员全部倒下。")
     finished_dialog.popup_centered()
 
 func _choose(key: String) -> void:
@@ -252,6 +264,7 @@ func _choose(key: String) -> void:
         if not battle.self_action(battle.active_id(),name):
             battle.push_log("资源不足或本次行动已调息，指令未执行。")
         chosen = "移动"
+        _update_hover(hovered)
         _refresh()
         return
     if name != "移动" and not battle.can_pay(battle.active_id(),name):
@@ -269,21 +282,23 @@ func _on_action_hover(key: String) -> void:
     if not _active_usable():
         return
     var name: String = _resolve_button(key)
-    var spec: Dictionary = BattleState.SKILLS[name]
+    if not battle.skills.has(name):
+        return
+    var spec: Dictionary = battle.skills[name]
     preview_text.text = "%s\n消耗：%d AP / %d内力\n\n%s" % [name,spec["ap"],spec["qi"],_action_description(name)]
     preview_panel.show()
 
 func _action_description(name: String) -> String:
     match name:
         "破风剑": return "3格八方向直线剑气，沿途敌人分别判定命中。"
-        "回锋剑": return "近战攻击后免费后撤1格，不触发借机攻击。"
+        "回锋剑": return "近战攻击后自动沿反方向免费后撤1格；每次行动一次，免借机攻击；落点不合法则留在原地。"
         "穿云枪": return "恰好2格的直线枪击，破甲1。"
         "挑枪": return "恰好2格直线攻击，命中后击退1格。"
         "震山掌": return "近身攻击，命中后击退1格。"
         "截脉指": return "2格内直线攻击，命中后降低敌人下次行动2AP。"
         "守关式": return "下次被命中伤害减25%，与防御护甲互斥。"
         "普攻": return "相邻一格攻击，符合条件可触发反击。"
-        "燕行步": return "3格内轻功跳跃，能越过低障碍，免借机攻击。"
+        "燕行步": return "3格内轻功跳跃，能越过低障碍，免借机攻击；每次行动一次。"
         "防御": return "下次命中护甲+2。"
         "调息": return "恢复4内力（不超过上限），本次行动限一次。"
         _: return ""
@@ -293,6 +308,7 @@ func _on_action_leave() -> void:
 
 func _update_hover(cell: Vector2i) -> void:
     hovered = cell
+    preview_panel.position.x = 20.0 if _cell_pixel(cell).x > 900.0 else 952.0
     hovered_route.clear()
     if not battle.board.inside(cell) or not _active_usable():
         preview_panel.hide()
@@ -304,26 +320,48 @@ func _update_hover(cell: Vector2i) -> void:
         if hovered_route.is_empty():
             preview_panel.hide()
         else:
-            var total: int = battle.board.path_ap(hovered_route)
-            var danger: Array[String] = battle.risky_route(battle.active_id(),hovered_route)
-            preview_text.text = "移动至 %s\n消耗：%d AP / 当前%d\n%s" % [str(cell),total,battle.active()["ap"],"借机攻击风险："+"、".join(PackedStringArray(danger)) if not danger.is_empty() else "无借机攻击风险"]
+            var plan: Dictionary = battle.movement_preview(battle.active_id(),hovered_route)
+            preview_text.text = "移动至 %s\n消耗：%d AP / 当前%d\n%s\n%s" % [str(cell),plan["ap"],battle.active()["ap"],"可执行" if plan["valid"] else "AP不足或路径不合法",_risk_description(plan)]
             preview_panel.show()
     elif chosen == "燕行步":
-        var allowed: bool = battle.board.leap_allowed(battle.active()["pos"],cell,battle.units,battle.active_id())
+        var allowed: bool = battle.can_pay(battle.active_id(),"燕行步") and battle.board.leap_allowed(battle.active()["pos"],cell,battle.units,battle.active_id())
         preview_text.text = "燕行步\n2 AP / 4内力\n%s" % ("合法落点：免借机攻击" if allowed else "落点不可用或穿越了实墙")
         preview_panel.show()
     elif uid >= 0 and battle.units[uid]["side"] != battle.active()["side"]:
         if battle.valid_attack(battle.active_id(),uid,chosen):
-            var chance: int = battle.hit_chance(battle.active_id(),uid,chosen)
-            var damage: int = battle.expected_damage(battle.active_id(),uid,chosen)
-            var counter: String = "会自动反击" if (chosen in ["普攻","回锋剑","震山掌"] and int(battle.units[uid]["rp"]) > 0 and battle.zoc_threatens(battle.units[uid],battle.active()["pos"])) else "不可自动反击或已用RP"
-            preview_text.text = "%s → %s\n命中：%d%%　命中伤害：%d\n消耗：%dAP / %d内力\n目标：%s" % [chosen,battle.units[uid]["name"],chance,damage,BattleState.SKILLS[chosen]["ap"],BattleState.SKILLS[chosen]["qi"],counter]
+            var plan: Dictionary = battle.attack_preview(battle.active_id(),uid,chosen)
+            var lines: Array[String] = ["%s → %s" % [chosen,battle.units[uid]["name"]]]
+            for target in plan["targets"]:
+                lines.append("%s：命中%d%% / 命中伤害%d" % [battle.units[int(target["id"])]["name"],target["chance"],target["damage"]])
+            lines.append("消耗%d AP / %d内力；余%d AP / %d内力" % [battle.skills[chosen]["ap"],battle.skills[chosen]["qi"],plan["ap_after"],plan["qi_after"]])
+            lines.append("命中后："+_counter_description(plan["counter_on_hit"]))
+            lines.append("落空后："+_counter_description(plan["counter_on_miss"]))
+            if chosen in ["震山掌","挑枪"]:
+                lines.append("命中落点：%s" % str(plan["target_on_hit"]))
+            elif chosen == "截脉指":
+                lines.append("命中且存活：下次行动AP−2（不叠加）")
+            elif chosen == "回锋剑":
+                lines.append("攻击后位置：%s" % str(plan["attacker_on_hit"]))
+            if not plan["valid"]:
+                lines.append("资源不足，无法执行")
+            preview_text.text = "\n".join(PackedStringArray(lines))
         else:
             preview_text.text = "不在%s的合法攻击范围内。" % chosen
         preview_panel.show()
     else:
         preview_panel.hide()
     queue_redraw()
+
+func _counter_description(counter: Dictionary) -> String:
+    if counter.is_empty():
+        return "无自动反击"
+    return "%s反击%d%% / 命中伤害%d" % [battle.units[int(counter["source"])]["name"],counter["chance"],counter["damage"]]
+
+func _risk_description(plan: Dictionary) -> String:
+    var lines: Array[String] = []
+    for risk in plan["risks"]:
+        lines.append("%s借机%d%% / 命中伤害%d–%d" % [battle.units[int(risk["source"])]["name"],risk["chance"],risk["damage"],risk["max_damage"]])
+    return "无借机攻击风险" if lines.is_empty() else "\n".join(PackedStringArray(lines))
 
 func _click_cell(cell: Vector2i) -> void:
     if not _active_usable() or not battle.board.inside(cell):
@@ -337,7 +375,9 @@ func _click_cell(cell: Vector2i) -> void:
             var danger: Array[String] = battle.risky_route(battle.active_id(),route)
             if not danger.is_empty():
                 pending_route = route
-                confirm_move.dialog_text = "路径可能受到借机攻击：%s。伤害可能让角色中途倒下。仍然移动吗？" % "、".join(PackedStringArray(danger))
+                pending_actor = battle.active_id()
+                pending_generation = battle_generation
+                confirm_move.dialog_text = _risk_description(battle.movement_preview(pending_actor,route))+"\n伤害可能让角色中途倒下。仍然移动吗？"
                 confirm_move.popup_centered()
             else:
                 battle.movement(battle.active_id(),route)
@@ -359,19 +399,27 @@ func _click_cell(cell: Vector2i) -> void:
         _update_hover(cell)
 
 func _commit_pending_move() -> void:
+    confirm_move.hide()
     if not _active_usable():
-        pending_route.clear()
+        _clear_pending()
         return
-    if not pending_route.is_empty():
+    if pending_generation == battle_generation and pending_actor == battle.active_id() and not pending_route.is_empty():
         battle.movement(battle.active_id(),pending_route)
-    pending_route.clear()
+    _clear_pending()
+    _update_hover(hovered)
     _refresh()
     if battle.result == "" and int(battle.active()["hp"]) <= 0:
         _end_turn()
 
+func _clear_pending() -> void:
+    pending_route.clear()
+    pending_actor = -1
+    pending_generation = -1
+
 func _cancel() -> void:
     chosen = "移动"
-    pending_route.clear()
+    _clear_pending()
+    confirm_move.hide()
     hovered_route.clear()
     preview_panel.hide()
     _refresh()
@@ -386,11 +434,12 @@ func _end_turn() -> void:
     _refresh()
     if battle.result == "" and battle.active()["side"] == "enemy":
         enemy_busy = true
-        call_deferred("_enemy_turn")
+        call_deferred("_enemy_turn",battle_generation)
 
-func _enemy_turn() -> void:
-    var token: int = battle_generation
-    if not is_inside_tree() or battle.result != "":
+func _enemy_turn(token: int) -> void:
+    if token != battle_generation:
+        return
+    if not is_inside_tree() or battle.result != "" or battle.active()["side"] != "enemy":
         enemy_busy = false
         return
     await get_tree().create_timer(0.3).timeout
@@ -407,7 +456,7 @@ func _enemy_turn() -> void:
     _refresh()
     if battle.result == "" and battle.active()["side"] == "enemy":
         enemy_busy = true
-        call_deferred("_enemy_turn")
+        call_deferred("_enemy_turn",battle_generation)
 
 func _cell_pixel(cell: Vector2i) -> Vector2:
     return ORIGIN+Vector2(float(cell.x-cell.y)*TILE_HALF.x,float(cell.x+cell.y)*TILE_HALF.y)
@@ -448,7 +497,7 @@ func _draw() -> void:
                 var cell: Vector2i = enemy["pos"]+d
                 if battle.board.inside(cell) and battle.zoc_threatens(enemy,cell):
                     var p: Vector2 = _cell_pixel(cell)
-                    draw_arc(p,7.0,0.0,TAU,18,Color("#c96e72a8"),1.0)
+                    draw_arc(p,7.0,0.0,TAU,18,Color("#c96e72a8") if int(enemy["rp"]) > 0 else Color("#6b666680"),1.0)
     for u in battle.units:
         if int(u["hp"]) <= 0:
             continue
@@ -460,7 +509,8 @@ func _draw() -> void:
         draw_circle(p+Vector2(0,-11),13,fill)
         draw_string(get_theme_default_font(),p+Vector2(-21,-7),str(u["name"]).substr(0,1),HORIZONTAL_ALIGNMENT_CENTER,42,13,Color.WHITE)
         var f: Vector2i = u["facing"]
-        draw_line(p+Vector2(0,-11),p+Vector2(f.x*10,f.y*9-11),Color("#fff3e2"),2.5)
+        var facing_screen: Vector2 = (_cell_pixel(u["pos"]+f)-p).normalized()*16.0
+        draw_line(p+Vector2(0,-11),p+Vector2(0,-11)+facing_screen,Color("#fff3e2"),2.5)
         draw_rect(Rect2(p+Vector2(-17,9),Vector2(34,4)),Color("#4c2828"),true)
         draw_rect(Rect2(p+Vector2(-17,9),Vector2(34.0*float(u["hp"])/float(u["max_hp"]),4)),Color("#7fc894"),true)
     draw_string(get_theme_default_font(),Vector2(20,122),"青崖渡 · B1 渡口截箱",HORIZONTAL_ALIGNMENT_LEFT,-1,21,Color("#e3e9dc"))
