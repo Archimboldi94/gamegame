@@ -1,0 +1,131 @@
+# 清理记录（2026-10-15）
+
+验证：rg 确认下列删除文件在 scripts/scenes/tests/data/project.godot/export_presets.cfg 中无引用（含动态路径模式 units/%s_%s、tiles/top_%s_%d、ui/btn_*）；godot --headless --import 后 tests/run_tests.gd：2303 PASS / 0 FAIL。
+
+## 移动（归档）
+- wuxia-tactics/01_Godot工程/WuxiaTactics_Core_v2.0 → wuxia-tactics/archive/WuxiaTactics_Core_v2.0
+- wuxia-tactics/05_历史文档 → wuxia-tactics/archive/05_历史文档
+- wuxia-tactics/06_早期样机与脚本 → wuxia-tactics/archive/06_早期样机与脚本
+
+## 删除
+- 过期文档/提示词：tactics-tri/PROMPT.md、codex-claude-hud-summary.md、codex-miniature-summary.md、codex-ui-summary.md、docs/WUXIA_PHASE_A_NOTES.md；wuxia-tactics/00_项目交接说明.md、01_AGENT启动指令_直接复制.md、02_文件清单_SHA256.txt（已失效）
+- 日志：wuxia-tactics/.../WuxiaTactics_Core_v2.0/artifacts/*.log（23 个）；本地未跟踪 codex-claude-hud-pass.log、shots/ 截图
+- 林砚试制图未跟踪的 .png.import：图片仅供美术参考、运行时未引用，删除并在 art/ 加 .gdignore 不再导入
+- 未引用旧贴图（含同名 .import），共 117 张：
+  - tactics-tri/assets/tiles/bridge_0.png
+  - tactics-tri/assets/tiles/bridge_1.png
+  - tactics-tri/assets/tiles/bridge_2.png
+  - tactics-tri/assets/tiles/bridge_3.png
+  - tactics-tri/assets/tiles/bridge_4.png
+  - tactics-tri/assets/tiles/bridge_5.png
+  - tactics-tri/assets/tiles/bridge_6.png
+  - tactics-tri/assets/tiles/bridge_7.png
+  - tactics-tri/assets/tiles/bridge_8.png
+  - tactics-tri/assets/tiles/top_bridge.png
+  - tactics-tri/assets/tiles/forest_0.png
+  - tactics-tri/assets/tiles/forest_1.png
+  - tactics-tri/assets/tiles/forest_2.png
+  - tactics-tri/assets/tiles/forest_3.png
+  - tactics-tri/assets/tiles/forest_4.png
+  - tactics-tri/assets/tiles/forest_5.png
+  - tactics-tri/assets/tiles/forest_6.png
+  - tactics-tri/assets/tiles/forest_7.png
+  - tactics-tri/assets/tiles/forest_8.png
+  - tactics-tri/assets/tiles/top_forest.png
+  - tactics-tri/assets/tiles/grass_0.png
+  - tactics-tri/assets/tiles/grass_1.png
+  - tactics-tri/assets/tiles/grass_2.png
+  - tactics-tri/assets/tiles/grass_3.png
+  - tactics-tri/assets/tiles/grass_4.png
+  - tactics-tri/assets/tiles/grass_5.png
+  - tactics-tri/assets/tiles/grass_6.png
+  - tactics-tri/assets/tiles/grass_7.png
+  - tactics-tri/assets/tiles/grass_8.png
+  - tactics-tri/assets/tiles/top_grass.png
+  - tactics-tri/assets/tiles/ice_0.png
+  - tactics-tri/assets/tiles/ice_1.png
+  - tactics-tri/assets/tiles/ice_2.png
+  - tactics-tri/assets/tiles/ice_3.png
+  - tactics-tri/assets/tiles/ice_4.png
+  - tactics-tri/assets/tiles/ice_5.png
+  - tactics-tri/assets/tiles/ice_6.png
+  - tactics-tri/assets/tiles/ice_7.png
+  - tactics-tri/assets/tiles/ice_8.png
+  - tactics-tri/assets/tiles/top_ice.png
+  - tactics-tri/assets/tiles/ruins_0.png
+  - tactics-tri/assets/tiles/ruins_1.png
+  - tactics-tri/assets/tiles/ruins_2.png
+  - tactics-tri/assets/tiles/ruins_3.png
+  - tactics-tri/assets/tiles/ruins_4.png
+  - tactics-tri/assets/tiles/ruins_5.png
+  - tactics-tri/assets/tiles/ruins_6.png
+  - tactics-tri/assets/tiles/ruins_7.png
+  - tactics-tri/assets/tiles/ruins_8.png
+  - tactics-tri/assets/tiles/top_ruins.png
+  - tactics-tri/assets/tiles/snow_0.png
+  - tactics-tri/assets/tiles/snow_1.png
+  - tactics-tri/assets/tiles/snow_2.png
+  - tactics-tri/assets/tiles/snow_3.png
+  - tactics-tri/assets/tiles/snow_4.png
+  - tactics-tri/assets/tiles/snow_5.png
+  - tactics-tri/assets/tiles/snow_6.png
+  - tactics-tri/assets/tiles/snow_7.png
+  - tactics-tri/assets/tiles/snow_8.png
+  - tactics-tri/assets/tiles/top_snow.png
+  - tactics-tri/assets/tiles/stone_0.png
+  - tactics-tri/assets/tiles/stone_1.png
+  - tactics-tri/assets/tiles/stone_2.png
+  - tactics-tri/assets/tiles/stone_3.png
+  - tactics-tri/assets/tiles/stone_4.png
+  - tactics-tri/assets/tiles/stone_5.png
+  - tactics-tri/assets/tiles/stone_6.png
+  - tactics-tri/assets/tiles/stone_7.png
+  - tactics-tri/assets/tiles/stone_8.png
+  - tactics-tri/assets/tiles/top_stone.png
+  - tactics-tri/assets/tiles/wall_0.png
+  - tactics-tri/assets/tiles/wall_1.png
+  - tactics-tri/assets/tiles/wall_2.png
+  - tactics-tri/assets/tiles/wall_3.png
+  - tactics-tri/assets/tiles/wall_4.png
+  - tactics-tri/assets/tiles/wall_5.png
+  - tactics-tri/assets/tiles/wall_6.png
+  - tactics-tri/assets/tiles/wall_7.png
+  - tactics-tri/assets/tiles/wall_8.png
+  - tactics-tri/assets/tiles/top_wall.png
+  - tactics-tri/assets/tiles/water_0.png
+  - tactics-tri/assets/tiles/water_1.png
+  - tactics-tri/assets/tiles/water_2.png
+  - tactics-tri/assets/tiles/water_3.png
+  - tactics-tri/assets/tiles/water_4.png
+  - tactics-tri/assets/tiles/water_5.png
+  - tactics-tri/assets/tiles/water_6.png
+  - tactics-tri/assets/tiles/water_7.png
+  - tactics-tri/assets/tiles/water_8.png
+  - tactics-tri/assets/tiles/top_water.png
+  - tactics-tri/assets/ui/arrow.png
+  - tactics-tri/assets/ui/arrow_ne.png
+  - tactics-tri/assets/ui/arrow_nw.png
+  - tactics-tri/assets/ui/arrow_se.png
+  - tactics-tri/assets/ui/arrow_sw.png
+  - tactics-tri/assets/ui/button.png
+  - tactics-tri/assets/ui/button_disabled.png
+  - tactics-tri/assets/ui/button_hover.png
+  - tactics-tri/assets/ui/button_pressed.png
+  - tactics-tri/assets/units/ali.png
+  - tactics-tri/assets/units/baitang.png
+  - tactics-tri/assets/units/bandit.png
+  - tactics-tri/assets/units/crossbow.png
+  - tactics-tri/assets/units/gelan.png
+  - tactics-tri/assets/units/leader_a.png
+  - tactics-tri/assets/units/leader_b.png
+  - tactics-tri/assets/units/linyan.png
+  - tactics-tri/assets/units/medic.png
+  - tactics-tri/assets/units/moqi.png
+  - tactics-tri/assets/units/qinlie.png
+  - tactics-tri/assets/units/shaman.png
+  - tactics-tri/assets/units/shenmo.png
+  - tactics-tri/assets/units/spear.png
+  - tactics-tri/assets/units/suqing.png
+  - tactics-tri/assets/units/suzhi.png
+  - tactics-tri/assets/units/wenlan.png
+  - tactics-tri/assets/units/wenzhou.png

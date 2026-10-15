@@ -4,7 +4,7 @@
 - 基线工程：`tactics-tri`（Claude 等距 UI / 美术管线）
 - **HUD 基线：Claude `f77192b`，不是 `d54bd9b` 双头像 HUD。** 顶部回合与时间轴、左侧纵向工具、右侧行动菜单、左下单位/地形信息与右下富文本预测；保留 GDD 的 AP / 内力 / 八向 / ZoC / 反击接线。
 - 规则权威：`wuxia-tactics/02_当前设计文档/武侠战棋_GDD_v2.0.md`（【已定】必须实现；【建议】可调）
-- 参考实现（仅规则/数据，不整体搬 UI）：`wuxia-tactics/01_Godot工程/WuxiaTactics_Core_v2.0/`
+- 参考实现（仅规则/数据，不整体搬 UI）：`wuxia-tactics/archive/WuxiaTactics_Core_v2.0/`
 - 旧 README / 天平之誓剧情：可忽略；投票抉择、多战程故事可后置
 
 ## 1. 保留（tactics-tri 优势）

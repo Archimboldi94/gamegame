@@ -3,7 +3,7 @@
 ## 基线切换【重要】
 
 - **现行开发基线：`tactics-tri/`**（Claude 等距渲染、战斗 HUD、美术管线）。
-- **`01_Godot工程/WuxiaTactics_Core_v2.0/` 降级为规则/数据参考**，不再作为主工程继续堆 UI。
+- **`archive/WuxiaTactics_Core_v2.0/`（已归档） 降级为规则/数据参考**，不再作为主工程继续堆 UI。
 - 权威设计：`02_当前设计文档/武侠战棋_GDD_v2.0.md`（【已定】必做，【建议】可调）。
 - 迁移计划：`tactics-tri/docs/WUXIA_MIGRATION.md`。
 

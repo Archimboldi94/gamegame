@@ -1,56 +1,23 @@
-# 《天平之誓》
+# 武侠战棋（tactics-tri 基线）
 
-原创等距视角战术角色扮演游戏（Godot 4.3 / GDScript，PC 鼠标键盘与安卓横屏）。
+Godot 4.6 等距战棋工程，当前按《武侠战棋 GDD v2.0》开发（AP/内力、八向移动、控制区、反击/借机，B1 青石渡战斗）。
 
-视觉采用原创波斯细密画：青金石蓝、朱砂红、翡翠绿与金色线饰，人物长袍刺绣、手稿式肖像、植物纹地表与雕刻石壁均由 Pillow 程序绘制。全部美术、剧情与文字均为原创或程序生成，详见 `ART_LICENSE.md`。
+## 文档
+- 权威设计：[`../wuxia-tactics/02_当前设计文档/武侠战棋_GDD_v2.0.md`](../wuxia-tactics/02_当前设计文档/武侠战棋_GDD_v2.0.md)
+- 美术 / HUD 规范：`../wuxia-tactics/03_美术与HUD规范/`；地图蓝图：`../wuxia-tactics/04_地图蓝图与数据/`
+- 迁移计划：[`docs/WUXIA_MIGRATION.md`](docs/WUXIA_MIGRATION.md)；清理记录：[`docs/CLEANUP.md`](docs/CLEANUP.md)
+- 开发状态：[`../wuxia-tactics/DEV_STATUS.md`](../wuxia-tactics/DEV_STATUS.md)
 
-## 操作（触屏）
-
-- 点击蓝色格子移动；红框为攻击可及范围，红色填充的敌人可以攻击。
-- 右侧大按钮菜单：攻击 / 技能 / 撤销移动 / 待机（结束）。
-- 点击目标先显示伤害预测（伤害、命中、背后/侧面/高低差/夹击加成），再次点击或按「确认」执行。
-- 单指拖动平移，双指捏合缩放（鼠标滚轮亦可）；左侧有「镜头归位 / 左转90° / 右转90° / 放大 / 缩小 / 速度」按钮。旋转后仍按脚下格子点选；挡住选中格的单位会半透明，选中格描边画在单位之上。同一格再点可在单位与地面之间切换。
-- 安卓返回键：取消当前选择或撤销移动（标题画面按返回键退出）。
-- 点击敌人可查看其移动范围（橙色）。
-
-## 操作（PC 鼠标 / 键盘）
-
-| 输入 | 功能 |
-| --- | --- |
-| 鼠标左键 | 与触屏点击相同；左键拖动也可平移 |
-| 悬停地格 | 青色细描边；显示单位生命、技力、职业与地形信息，不改变当前选择或预测目标 |
-| 右键轻点 / Esc | 取消攻击或技能选择；主菜单下撤销尚可撤销的移动（与安卓返回键一致） |
-| 中键拖动 / 右键拖动 | 平移镜头；右键拖动结束不会取消行动 |
-| 空格 / Enter | 主菜单待机；已有合法目标时确认攻击或技能；战前及结果弹窗确认默认按钮 |
-| 轻按 A / S | 攻击 / 技能（松开时触发） |
-| Z / Backspace | 撤销移动；目标或技能菜单下也可直接撤销尚未出手的移动 |
-| Q / E | 左转 / 右转 90° |
-| R | 重置朝向与缩放，镜头回到当前行动单位 |
-| + / -、小键盘加减、滚轮 | 缩放；滚轮以指针位置为中心，预测说明区仍可滚动阅读 |
-| 方向键 / 按住 WASD | 持续平移；按住 A/S 超过 180 毫秒进入平移，不触发攻击 / 技能 |
-
-A/S 同时承担行动与平移，故区分轻按和按住；方向键无需等待。快捷键忽略长按重复，确认键不会跳过目标预测或在敌方行动时结束回合。失去窗口焦点会清除拖动与按键状态。触屏单指拖动、双指捏合与安卓返回键保留。
-
-## 规则要点
-
-- **自动朝向**：回合结束时不再手动选择方向。单位自动面向本回合最后一次攻击/技能的目标；若未出手，则保持移动最后一步的朝向。朝向机制仍然有效：侧面攻击、背后攻击有额外伤害与命中。
-- **深水不可通行**：河流/深水（深蓝色、带水流纹）步行单位无法进入，只能经由浅滩（带踏石）或木桥渡河；寻路、敌方AI与击退都不会把步行单位送入深水（击退撞向深水视为撞击）。
-- 高低差：攀爬受跳跃力限制；居高临下伤害提高，远程射程增加。
-- 速度决定行动顺序，顶部显示接下来 8 手的时间轴；待机比行动更快轮到下一手。
-- TP：每回合开始 +1，技能消耗 TP。
-- 夹击：攻击时若队友站在目标正对面，队友自动追击。
-- 地形：树林加回避、浅滩减速、火焰地面灼烧、冰冻减速。
-
-## 构建与测试
-
+## 运行与测试
 ```bash
-godot --headless --path . --import
-godot --headless --path . -s tests/run_tests.gd          # 规则测试，输出 PASS/FAIL
-godot --headless --path . --export-debug Android build/tactics-tri.apk
+cd tactics-tri
+godot --headless --path . --import             # 首次导入资源
+godot --path .                                 # 运行游戏
+godot --headless --path . -s tests/run_tests.gd # 规则测试，输出 PASS/FAIL
+godot --headless --path . --export-debug Android build/tactics-tri.apk  # 导出 APK
 ```
 
-截图模式：`godot --path . -- --shot=battle --out=shots/battle.png`（可选 title / dialogue / vote / battlemain / battle2a / battle2b / battlefx / ending）。`battle` 展示双肖像伤害预测，`battlemain` 展示移动范围与四个行动按钮。
-
-完整重建美术：`python3 tools/gen_art.py`；只更新战场、人物、肖像、界面和地格特效：`python3 tools/gen_art.py --battle-only`。共享配色和绘制函数位于 `tools/miniature.py`，生成器不读取参考图。地格为 160×80、每级高差 40，单位显示比例为 0.82；地形、光标、特效与拾取共用 `IsoView` 的尺寸。
-
-本轮视觉截图（2400×1080）：[伤害预测](shots/battle_miniature.png)、[主行动菜单](shots/battle_main_miniature.png)、[雪岭](shots/battle2a_miniature.png)、[对话肖像](shots/dialogue_miniature.png)。实现与验证记录见 [codex-miniature-summary.md](codex-miniature-summary.md)。
+## 目录
+- `scripts/rules/` 规则与数据；`scripts/game/` 场景与表现；`scenes/` 场景
+- `data/wuxia/` B1 地图与战斗数据；`assets/` 运行时贴图；`audio/`、`fonts/`
+- `art/wuxia/` 武侠美术试制（参考稿，不参与导入）；`tools/` 程序美术/音效生成脚本
